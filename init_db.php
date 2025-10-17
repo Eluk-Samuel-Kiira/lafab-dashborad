@@ -57,7 +57,9 @@ foreach ($tables as $table_sql) {
 }
 
 // Insert default posters
-$default_posters = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson', 'David Brown'];
+$default_posters = ['Mukhwana Colette Donata', 'Viola Charlotte', 'Mathias Kyam', 'Judith Kiiza', 'Batuuka kevin Joseph',
+                     'MOSES WAMANYA', 'Samuel Kiira', 'Martin Mubiru', 'Twesigye Jordan', 'Musinguzi', 'Patricia', 'Evie',
+                     'Sanyu', ''];
 foreach ($default_posters as $poster) {
     try {
         $stmt = $db->prepare("INSERT OR IGNORE INTO posters (name) VALUES (?)");

@@ -10,5 +10,23 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- Mobile Header -->
+    <nav class="mobile-header d-lg-none">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <button class="menu-toggle" type="button">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <a class="navbar-brand" href="dashboard.php">
+                    LaFab Solutions
+                </a>
+                <div></div> <!-- Spacer for balance -->
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
     <div class="container-fluid">
         <div class="row">

@@ -16,6 +16,10 @@ $nav_items = [
         'icon' => 'fa-users',
         'text' => 'Posters Stats'
     ],
+    'manage_posters.php' => [
+        'icon' => 'fa-user-cog',
+        'text' => 'Manage Posters'
+    ],
     'seo_stats.php' => [
         'icon' => 'fa-search',
         'text' => 'SEO Stats'
