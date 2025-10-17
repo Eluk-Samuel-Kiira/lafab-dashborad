@@ -85,65 +85,14 @@ body {
 }
 
 /* Tables */
-/* Enhanced Table Responsive Styles */
 .table-responsive {
     border-radius: 8px;
     overflow: hidden;
-    position: relative;
 }
 
-/* Horizontal scroll indicators */
-.table-responsive::before,
-.table-responsive::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: 1;
-}
-
-.table-responsive::before {
-    left: 0;
-    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
-}
-
-.table-responsive::after {
-    right: 0;
-    background: linear-gradient(to left, rgba(0,0,0,0.1), transparent);
-}
-
-.table-responsive.scroll-left::before,
-.table-responsive.scroll-right::after {
-    opacity: 1;
-}
-
-/* Custom scrollbar for tables */
-.table-responsive::-webkit-scrollbar {
-    height: 8px;
-}
-
-.table-responsive::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 0 0 4px 4px;
-}
-
-.table-responsive::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-
-.table-responsive::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Table styling enhancements */
 .table {
     margin-bottom: 0;
-    min-width: 600px; /* Ensure table has minimum width */
+    width: 100%;
 }
 
 .table th {
@@ -152,9 +101,6 @@ body {
     background-color: #f8f9fa;
     padding: 1rem;
     white-space: nowrap;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
 .table td {
@@ -287,13 +233,17 @@ body {
         font-size: 0.8rem;
     }
     
+    /* Enhanced Mobile Table Styles */
     .table-responsive {
         border: 1px solid #dee2e6;
-        margin-bottom: 1rem;
+        border-radius: 8px;
+        background: white;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     }
     
     .table {
-        min-width: 100%;
+        min-width: 600px; /* Ensure table doesn't collapse */
         font-size: 0.875rem;
     }
     
@@ -303,9 +253,22 @@ body {
         white-space: nowrap;
     }
     
-    /* Add visual feedback for scrolling */
+    /* Visual indicator for scrollable tables */
     .table-responsive {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        position: relative;
+    }
+    
+    .table-responsive::after {
+        content: '↔';
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(0,0,0,0.1);
+        color: #6c757d;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        pointer-events: none;
     }
     
     /* Button adjustments */
@@ -341,6 +304,7 @@ body {
     
     .table {
         font-size: 0.8rem;
+        min-width: 500px; /* Slightly smaller min-width for very small screens */
     }
     
     .table th,
@@ -348,16 +312,11 @@ body {
         padding: 0.5rem 0.375rem;
     }
     
-    .table-responsive::-webkit-scrollbar {
-        height: 6px;
-    }
-    
     .btn {
         padding: 0.6rem 1rem;
         font-size: 0.9rem;
     }
 }
-
 
 /* Large screens */
 @media (min-width: 1200px) {
