@@ -128,12 +128,19 @@ body {
     font-weight: 600;
 }
 
-/* Charts Container */
 .chart-container {
     position: relative;
-    height: 300px;
-    margin-bottom: 1rem;
+    width: 100%;
+    height: 250px;
+    overflow: hidden;
 }
+
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+}
+
 
 /* Alerts */
 .alert {
@@ -233,43 +240,40 @@ body {
         font-size: 0.8rem;
     }
     
-    /* Enhanced Mobile Table Styles */
-    .table-responsive {
-        border: 1px solid #dee2e6;
+        .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         border-radius: 8px;
         background: white;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     }
-    
+
     .table {
-        min-width: 600px; /* Ensure table doesn't collapse */
+        width: 100%;
+        border-collapse: collapse;
         font-size: 0.875rem;
     }
-    
+
     .table th,
     .table td {
-        padding: 0.75rem 0.5rem;
         white-space: nowrap;
+        padding: 0.75rem;
     }
-    
-    /* Visual indicator for scrollable tables */
-    .table-responsive {
-        position: relative;
-    }
-    
+
+    /* Optional: subtle scroll hint */
     .table-responsive::after {
-        content: '↔';
+        content: '↔ Swipe';
         position: absolute;
-        top: 5px;
-        right: 5px;
-        background: rgba(0,0,0,0.1);
+        top: 8px;
+        right: 8px;
+        background: rgba(0,0,0,0.05);
         color: #6c757d;
+        font-size: 0.7rem;
         padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 0.75rem;
-        pointer-events: none;
+        border-radius: 4px;
     }
+}
     
     /* Button adjustments */
     .btn {
