@@ -1,292 +1,91 @@
-/* Base Styles */
-* {
-    box-sizing: border-box;
+/* Enhanced Mobile Header */
+.mobile-header {
+    display: none;
+    background: #343a40;
+    color: white;
+    padding: 1rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: 60px;
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
-    margin: 0;
-    padding: 0;
-}
-
-/* Sidebar Styles */
-.sidebar {
-    min-height: 100vh;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    background-color: #343a40;
-}
-
-.sidebar .nav-link {
-    color: #adb5bd;
-    padding: 12px 15px;
-    margin: 3px 0;
-    border-radius: 5px;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-}
-
-.sidebar .nav-link:hover {
-    color: #fff;
-    background-color: #495057;
-}
-
-.sidebar .nav-link.active {
-    color: #fff;
-    background-color: #0d6efd;
+.mobile-header .navbar-brand {
+    color: white;
     font-weight: 600;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.2rem;
+    margin: 0 auto;
 }
 
-.sidebar .nav-link i {
-    margin-right: 10px;
-    width: 20px;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-/* Main Content */
-.main-content {
-    padding: 2rem;
-    background-color: #f8f9fa;
-    min-height: 100vh;
-}
-
-/* Cards */
-.card {
+.menu-toggle {
+    background: none;
     border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    margin-bottom: 1.5rem;
-    border-radius: 10px;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    position: absolute;
+    left: 1rem;
+    z-index: 1001;
+    transition: transform 0.3s ease;
 }
 
-.stat-card {
-    border-left: 4px solid #0d6efd;
-    height: 100%;
+.menu-toggle.active {
+    transform: rotate(90deg);
 }
 
-.stat-card .card-body {
-    padding: 1.5rem;
+/* Enhanced Sidebar Overlay */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.stat-card h3 {
-    font-size: 2rem;
-    margin: 0;
-    font-weight: 700;
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
 }
 
-.stat-card h6 {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
-
-/* Tables */
-.table-responsive {
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.table {
-    margin-bottom: 0;
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-    background-color: #f8f9fa;
-    padding: 1rem;
-}
-
-.table td {
-    padding: 1rem;
-    vertical-align: middle;
-}
-
-/* Forms */
-.form-control, .form-select {
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    padding: 0.75rem;
-}
-
-.form-label {
-    font-weight: 600;
-    color: #495057;
-    margin-bottom: 0.5rem;
-}
-
-.btn {
-    border-radius: 8px;
-    padding: 0.75rem 1.5rem;
-    font-weight: 600;
-}
-
-/* Charts Container */
-.chart-container {
-    position: relative;
-    height: 300px;
-    margin-bottom: 1rem;
-}
-
-/* Alerts */
-.alert {
-    border-radius: 8px;
-    border: none;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-/* Badges */
-.badge {
-    font-size: 0.75rem;
-    padding: 0.35em 0.65em;
-    border-radius: 6px;
-}
-
-/* Mobile Responsive */
+/* Enhanced Mobile Sidebar */
 @media (max-width: 768px) {
-    /* Sidebar becomes off-canvas on mobile */
+    .mobile-header {
+        display: flex;
+        align-items: center;
+    }
+    
     .sidebar {
         position: fixed;
         left: -100%;
         top: 0;
         width: 280px;
+        height: 100vh;
         z-index: 1000;
         transition: left 0.3s ease;
+        overflow-y: auto;
     }
     
     .sidebar.show {
         left: 0;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.3);
     }
     
-    /* Mobile Header */
-    .mobile-header {
-        display: flex;
-        background: #343a40;
-        color: white;
-        padding: 1rem;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 999;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .mobile-header .navbar-brand {
-        color: white;
-        font-weight: 600;
-        font-size: 1.2rem;
-        margin: 0 auto;
-    }
-    
-    .menu-toggle {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-        padding: 0.25rem 0.5rem;
-        position: absolute;
-        left: 1rem;
-    }
-    
-    /* Overlay for mobile sidebar */
-    .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 999;
-    }
-    
-    .sidebar-overlay.show {
-        display: block;
-    }
-    
-    /* Main content adjustments for mobile */
     .main-content {
         padding: 1rem;
-        margin-top: 60px; /* Account for fixed header */
+        margin-top: 60px;
     }
     
-    /* Card adjustments */
-    .card-body {
-        padding: 1rem;
-    }
-    
-    .stat-card h3 {
-        font-size: 1.5rem;
-    }
-    
-    .stat-card h6 {
-        font-size: 0.8rem;
-    }
-    
-    /* Table adjustments */
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-    
-    .table th, .table td {
-        padding: 0.5rem;
-    }
-    
-    /* Button adjustments */
-    .btn {
-        width: 100%;
-        margin-bottom: 0.5rem;
-    }
-    
-    .btn-group .btn {
-        width: auto;
-    }
-    
-    /* Form adjustments */
-    .form-control, .form-select {
-        font-size: 16px; /* Prevents zoom on iOS */
-    }
-    
-    /* Chart adjustments */
-    .chart-container {
-        height: 250px;
-    }
-}
-
-/* Small mobile devices */
-@media (max-width: 576px) {
-    .main-content {
-        padding: 0.75rem;
-    }
-    
-    .stat-card h3 {
-        font-size: 1.25rem;
-    }
-    
-    .table-responsive {
-        font-size: 0.75rem;
-    }
-    
-    .btn {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
-    }
-}
-
-/* Large screens */
-@media (min-width: 1200px) {
-    .main-content {
-        padding: 2.5rem;
-    }
-    
-    .stat-card h3 {
-        font-size: 2.25rem;
+    /* Prevent body scroll when sidebar is open */
+    body.sidebar-open {
+        overflow: hidden;
     }
 }

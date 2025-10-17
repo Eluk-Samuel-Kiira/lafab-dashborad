@@ -1,3 +1,43 @@
+<?php
+// Get current page filename
+$current_page = basename($_SERVER['PHP_SELF']);
+
+// Define navigation items
+$nav_items = [
+    'dashboard.php' => [
+        'icon' => 'fa-tachometer-alt',
+        'text' => 'Dashboard'
+    ],
+    'job_entry.php' => [
+        'icon' => 'fa-plus-circle', 
+        'text' => 'Add Job Posts'
+    ],
+    'posters_stats.php' => [
+        'icon' => 'fa-users',
+        'text' => 'Posters Stats'
+    ],
+    'manage_posters.php' => [
+        'icon' => 'fa-user-cog',
+        'text' => 'Manage Posters'
+    ],
+    'seo_stats.php' => [
+        'icon' => 'fa-search',
+        'text' => 'SEO Stats'
+    ],
+    'seo_entry.php' => [
+        'icon' => 'fa-chart-line',
+        'text' => 'Add SEO Data'
+    ],
+    'social_stats.php' => [
+        'icon' => 'fa-chart-bar',
+        'text' => 'Social Media Stats'
+    ],
+    'social_entry.php' => [
+        'icon' => 'fa-share-alt',
+        'text' => 'Add Social Media'
+    ]
+];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
