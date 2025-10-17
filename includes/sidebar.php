@@ -12,13 +12,13 @@ $nav_items = [
         'icon' => 'fa-plus-circle', 
         'text' => 'Add Job Posts'
     ],
-    'posters_stats.php' => [
-        'icon' => 'fa-users',
-        'text' => 'Posters Stats'
-    ],
     'manage_posters.php' => [
         'icon' => 'fa-user-cog',
         'text' => 'Manage Posters'
+    ],
+    'posters_stats.php' => [
+        'icon' => 'fa-users',
+        'text' => 'Posters Stats'
     ],
     'seo_stats.php' => [
         'icon' => 'fa-search',
@@ -41,7 +41,13 @@ $nav_items = [
 
 <div class="col-md-3 col-lg-2 bg-dark sidebar">
     <div class="sidebar-sticky pt-3">
-        <h4 class="text-white text-center mb-4">LaFab Solutions</h4>
+        <!-- Logo in Sidebar -->
+        <div class="text-center mb-4">
+            <a href="dashboard.php" class="d-inline-block">
+                <img src="../logo.svg" alt="LaFab Solutions" style="height: 40px;">
+            </a>
+        </div>
+        
         <ul class="nav flex-column">
             <?php foreach ($nav_items as $page => $item): ?>
                 <li class="nav-item">

@@ -1,0 +1,16 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d6efd" />
+      <stop offset="100%" stop-color="#6610f2" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="16" cy="16" r="14" fill="url(#favGradient)" />
+  
+  <!-- LFS Monogram -->
+  <path d="M9 9 L9 19 L13 19 L13 15 L11 15 L11 9 Z" fill="white" />
+  <path d="M15 9 L15 19 L19 19 L19 13 L17 13 L17 11 L19 11 L19 9 Z" fill="white" />
+  <path d="M21 9 C20 9, 19 10, 19 11 C19 12, 20 13, 21 13 C22 13, 23 14, 23 15 C23 16, 22 17, 21 17 L20 17 L20 15 L21 15 C21.5 15, 22 14.5, 22 14 C22 13.5, 21.5 13, 21 13 L20 13 L20 11 L21 11 C21.5 11, 22 10.5, 22 10 C22 9.5, 21.5 9, 21 9 Z" fill="white" />
+</svg>

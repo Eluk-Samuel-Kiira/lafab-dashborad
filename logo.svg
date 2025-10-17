@@ -1,0 +1,23 @@
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d6efd" />
+      <stop offset="100%" stop-color="#6610f2" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Logo Symbol -->
+  <g transform="translate(10, 10)">
+    <!-- L Shape -->
+    <path d="M0 0 L0 30 L20 30 L20 20 L10 20 L10 0 Z" fill="url(#gradient)" />
+    
+    <!-- F Shape -->
+    <path d="M25 0 L25 30 L45 30 L45 20 L35 20 L35 15 L45 15 L45 5 L35 5 L35 0 Z" fill="url(#gradient)" />
+    
+    <!-- S Shape (Abstract) -->
+    <path d="M50 0 C45 0, 40 5, 40 10 C40 15, 45 20, 50 20 C55 20, 60 25, 60 30 C60 35, 55 40, 50 40 L45 40 L45 35 L50 35 C53 35, 55 33, 55 30 C55 27, 53 25, 50 25 C47 25, 45 23, 45 20 C45 17, 47 15, 50 15 L55 15 L55 10 L50 10 C47 10, 45 8, 45 5 C45 2, 47 0, 50 0 Z" fill="url(#gradient)" />
+  </g>
+  
+  <!-- Company Name -->
+  <text x="75" y="35" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#343a40">LaFab</text>
+</svg>
