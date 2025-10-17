@@ -35,3 +35,10 @@
 
     <div class="container-fluid">
         <div class="row">
+
+
+<!-- 
+        http://localhost/job-dashboard/init_db.php
+        This app uses sqlite so if you want to crash the database to have a new one
+        Run the above link in the browser
+-->
