@@ -264,7 +264,7 @@ $posters = db_fetch_all("
                 <p class="text-muted">No recent job posting activity.</p>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-sm">
+                    <table class="table table-sm table-hover">
                         <thead>
                             <tr>
                                 <th>Poster</th>

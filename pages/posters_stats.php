@@ -55,7 +55,7 @@ $poster_stats = db_fetch_all($sql, [$start_date, $end_date]);
     <!-- Posters Statistics -->
     <div class="card">
         <div class="card-header">
-            <h6>Poster Performance (<?php echo $start_date . ' to ' . $end_date; ?>)</h6>
+            <h6 class="mb-0">Poster Performance (<?php echo $start_date . ' to ' . $end_date; ?>)</h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
