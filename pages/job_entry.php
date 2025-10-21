@@ -75,7 +75,7 @@ $recent_jobs = db_fetch_all("
             <button type="button" class="btn btn-outline-primary" onclick="window.location.href='manage_posters.php'">
                 <i class="fas fa-users"></i> Manage Posters
             </button>
-            <button type="button" class="btn btn-outline-info" onclick="window.location.href='jobs_dashboard.php'">
+            <button type="button" class="btn btn-outline-info" onclick="window.location.href='dashboard.php'">
                 <i class="fas fa-chart-bar"></i> View Dashboard
             </button>
         </div>

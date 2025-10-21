@@ -183,7 +183,7 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
                 <a href="add_job.php" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-plus-circle"></i> Add Job Post
                 </a>
-                <a href="jobs_dashboard.php" class="btn btn-sm btn-outline-secondary">
+                <a href="dashboard.php" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-sync"></i> Refresh
                 </a>
             </div>

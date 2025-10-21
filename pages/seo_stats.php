@@ -206,7 +206,7 @@ $all_keywords = db_fetch_all("
         <h1 class="h2">SEO Performance Dashboard</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
             <div class="btn-group me-2">
-                <a href="add_seo.php" class="btn btn-sm btn-outline-primary">
+                <a href="seo_entry.php" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-plus-circle"></i> Add SEO Data
                 </a>
                 <a href="seo_stats.php" class="btn btn-sm btn-outline-secondary">
