@@ -12,13 +12,13 @@ $nav_items = [
         'icon' => 'fa-plus-circle', 
         'text' => 'Add Job Posts'
     ],
-    'manage_posters.php' => [
-        'icon' => 'fa-user-cog',
-        'text' => 'Manage Posters'
-    ],
     'posters_stats.php' => [
         'icon' => 'fa-users',
         'text' => 'Posters Stats'
+    ],
+    'manage_posters.php' => [
+        'icon' => 'fa-user-cog',
+        'text' => 'Manage Posters'
     ],
     'seo_stats.php' => [
         'icon' => 'fa-search',

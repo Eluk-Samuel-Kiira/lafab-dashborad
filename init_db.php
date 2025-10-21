@@ -97,6 +97,7 @@ $social_tables = [
         link_clicks INTEGER DEFAULT 0,
         retweets INTEGER DEFAULT 0,
         reactions INTEGER DEFAULT 0,
+        saves INTEGER DEFAULT 0,  -- Add this line
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (platform_id) REFERENCES social_media_platforms (id)
     )",
