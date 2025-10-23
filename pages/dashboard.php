@@ -18,6 +18,36 @@ switch ($date_filter) {
         $end_date = $today;
         $period_label = 'Today';
         break;
+    case 'yesterday':
+        $start_date = date('Y-m-d', strtotime('-1 day'));
+        $end_date = date('Y-m-d', strtotime('-1 day'));
+        $period_label = 'Yesterday';
+        break;
+    case '2days':
+        $start_date = date('Y-m-d', strtotime('-1 day'));
+        $end_date = $today;
+        $period_label = 'Last 2 Days';
+        break;
+    case '3days':
+        $start_date = date('Y-m-d', strtotime('-2 days'));
+        $end_date = $today;
+        $period_label = 'Last 3 Days';
+        break;
+    case '4days':
+        $start_date = date('Y-m-d', strtotime('-3 days'));
+        $end_date = $today;
+        $period_label = 'Last 4 Days';
+        break;
+    case '5days':
+        $start_date = date('Y-m-d', strtotime('-4 days'));
+        $end_date = $today;
+        $period_label = 'Last 5 Days';
+        break;
+    case '6days':
+        $start_date = date('Y-m-d', strtotime('-5 days'));
+        $end_date = $today;
+        $period_label = 'Last 6 Days';
+        break;
     case 'week':
         $start_date = date('Y-m-d', strtotime('monday this week'));
         $end_date = $today;
@@ -80,6 +110,12 @@ function getTotalJobs($start_date, $end_date = null, $country = '') {
 
 // Get all counts with filters
 $daily_total = getTotalJobs($today, $today, $country_filter);
+$yesterday_total = getTotalJobs(date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day')), $country_filter);
+$two_days_total = getTotalJobs(date('Y-m-d', strtotime('-1 day')), $today, $country_filter);
+$three_days_total = getTotalJobs(date('Y-m-d', strtotime('-2 days')), $today, $country_filter);
+$four_days_total = getTotalJobs(date('Y-m-d', strtotime('-3 days')), $today, $country_filter);
+$five_days_total = getTotalJobs(date('Y-m-d', strtotime('-4 days')), $today, $country_filter);
+$six_days_total = getTotalJobs(date('Y-m-d', strtotime('-5 days')), $today, $country_filter);
 $weekly_total = getTotalJobs(date('Y-m-d', strtotime('monday this week')), $today, $country_filter);
 $monthly_total = getTotalJobs(date('Y-m-01'), $today, $country_filter);
 $quarterly_total = getTotalJobs(date('Y-m-d', strtotime(date('Y').'-'.((ceil(date('n')/3)-1)*3+1).'-01')), $today, $country_filter);
@@ -218,6 +254,12 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
                     <label class="form-label fw-semibold">Date Range</label>
                     <select name="date_range" class="form-select border-0 bg-light">
                         <option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option>
+                        <option value="yesterday" <?php echo $date_filter === 'yesterday' ? 'selected' : ''; ?>>Yesterday</option>
+                        <option value="2days" <?php echo $date_filter === '2days' ? 'selected' : ''; ?>>Last 2 Days</option>
+                        <option value="3days" <?php echo $date_filter === '3days' ? 'selected' : ''; ?>>Last 3 Days</option>
+                        <option value="4days" <?php echo $date_filter === '4days' ? 'selected' : ''; ?>>Last 4 Days</option>
+                        <option value="5days" <?php echo $date_filter === '5days' ? 'selected' : ''; ?>>Last 5 Days</option>
+                        <option value="6days" <?php echo $date_filter === '6days' ? 'selected' : ''; ?>>Last 6 Days</option>
                         <option value="week" <?php echo $date_filter === 'week' ? 'selected' : ''; ?>>This Week</option>
                         <option value="month" <?php echo $date_filter === 'month' ? 'selected' : ''; ?>>This Month</option>
                         <option value="quarter" <?php echo $date_filter === 'quarter' ? 'selected' : ''; ?>>This Quarter</option>
@@ -244,6 +286,76 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
                     </div>
                     <h4 class="fw-bold text-dark mb-1"><?php echo $daily_total; ?></h4>
                     <p class="text-muted small mb-0">Today</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-secondary"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $yesterday_total; ?></h4>
+                    <p class="text-muted small mb-0">Yesterday</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-success"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $two_days_total; ?></h4>
+                    <p class="text-muted small mb-0">2 Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-info"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $three_days_total; ?></h4>
+                    <p class="text-muted small mb-0">3 Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-warning"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $four_days_total; ?></h4>
+                    <p class="text-muted small mb-0">4 Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-danger"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $five_days_total; ?></h4>
+                    <p class="text-muted small mb-0">5 Days</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-day fa-2x text-dark"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $six_days_total; ?></h4>
+                    <p class="text-muted small mb-0">6 Days</p>
                 </div>
             </div>
         </div>
@@ -713,11 +825,17 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .stat-card:nth-child(1) { border-left-color: #0d6efd; }
-.stat-card:nth-child(2) { border-left-color: #198754; }
-.stat-card:nth-child(3) { border-left-color: #0dcaf0; }
-.stat-card:nth-child(4) { border-left-color: #ffc107; }
-.stat-card:nth-child(5) { border-left-color: #dc3545; }
-.stat-card:nth-child(6) { border-left-color: #6f42c1; }
+.stat-card:nth-child(2) { border-left-color: #6c757d; }
+.stat-card:nth-child(3) { border-left-color: #198754; }
+.stat-card:nth-child(4) { border-left-color: #0dcaf0; }
+.stat-card:nth-child(5) { border-left-color: #ffc107; }
+.stat-card:nth-child(6) { border-left-color: #dc3545; }
+.stat-card:nth-child(7) { border-left-color: #212529; }
+.stat-card:nth-child(8) { border-left-color: #198754; }
+.stat-card:nth-child(9) { border-left-color: #0dcaf0; }
+.stat-card:nth-child(10) { border-left-color: #ffc107; }
+.stat-card:nth-child(11) { border-left-color: #dc3545; }
+.stat-card:nth-child(12) { border-left-color: #6f42c1; }
 
 .stat-icon {
     opacity: 0.8;
