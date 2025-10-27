@@ -1,0 +1,8 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sql
+*.mdf
+*.ldf
