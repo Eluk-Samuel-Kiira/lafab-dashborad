@@ -14,27 +14,52 @@ switch ($date_range) {
     case 'last_7_days':
         $start_date = date('Y-m-d', strtotime('-7 days'));
         $period_label = 'Last 7 Days';
+        $trend_interval = 'daily';
+        break;
+    case 'last_30_days':
+        $start_date = date('Y-m-d', strtotime('-30 days'));
+        $period_label = 'Last 30 Days';
+        $trend_interval = 'daily';
         break;
     case 'last_month':
         $start_date = date('Y-m-01', strtotime('-1 month'));
         $end_date = date('Y-m-t', strtotime('-1 month'));
         $period_label = 'Last Calendar Month';
+        $trend_interval = 'weekly';
         break;
     case 'last_3_months':
         $start_date = date('Y-m-d', strtotime('-3 months'));
         $period_label = 'Last 3 Months';
+        $trend_interval = 'weekly';
         break;
     case 'last_6_months':
         $start_date = date('Y-m-d', strtotime('-6 months'));
         $period_label = 'Last 6 Months';
+        $trend_interval = 'monthly';
         break;
-    default: // last_30_days
+    case 'last_year':
+        $start_date = date('Y-m-d', strtotime('-1 year'));
+        $period_label = 'Last Year';
+        $trend_interval = 'monthly';
+        break;
+    case 'last_2_years':
+        $start_date = date('Y-m-d', strtotime('-2 years'));
+        $period_label = 'Last 2 Years';
+        $trend_interval = 'quarterly';
+        break;
+    case 'last_5_years':
+        $start_date = date('Y-m-d', strtotime('-5 years'));
+        $period_label = 'Last 5 Years';
+        $trend_interval = 'yearly';
+        break;
+    default:
         $start_date = date('Y-m-d', strtotime('-30 days'));
         $period_label = 'Last 30 Days';
+        $trend_interval = 'daily';
         break;
 }
 
-// Build WHERE clause
+// Build WHERE clause for main queries
 $where_conditions = ["stat_date BETWEEN ? AND ?"];
 $params = [$start_date, $end_date];
 
@@ -155,20 +180,64 @@ $content_stats = db_fetch_all("
     ORDER BY avg_engagement DESC
 ", [$start_date, $end_date]);
 
-// Monthly growth trends by platform and country
+// DYNAMIC GROWTH TRENDS - Adjusted based on date range
+$trends_where_conditions = ["stat_date BETWEEN ? AND ?"];
+$trends_params = [$start_date, $end_date];
+
+if ($platform_filter) {
+    $trends_where_conditions[] = "p.name = ?";
+    $trends_params[] = $platform_filter;
+}
+
+if ($country_filter) {
+    $trends_where_conditions[] = "sms.country = ?";
+    $trends_params[] = $country_filter;
+}
+
+$trends_where_clause = implode(" AND ", $trends_where_conditions);
+
+// Determine the grouping for trends based on date range
+switch ($trend_interval) {
+    case 'daily':
+        $date_format = '%Y-%m-%d';
+        $group_by = "stat_date";
+        $order_format = 'Y-m-d';
+        break;
+    case 'weekly':
+        $date_format = '%Y-%W';
+        $group_by = "strftime('%Y-%W', stat_date)";
+        $order_format = 'Y-W';
+        break;
+    case 'monthly':
+        $date_format = '%Y-%m';
+        $group_by = "strftime('%Y-%m', stat_date)";
+        $order_format = 'Y-m';
+        break;
+    case 'quarterly':
+        $date_format = '%Y-Q';
+        $group_by = "strftime('%Y', stat_date) || '-Q' || ((strftime('%m', stat_date) + 2) / 3)";
+        $order_format = 'Y-Q';
+        break;
+    case 'yearly':
+        $date_format = '%Y';
+        $group_by = "strftime('%Y', stat_date)";
+        $order_format = 'Y';
+        break;
+}
+
 $monthly_trends = db_fetch_all("
     SELECT 
-        strftime('%Y-%m', stat_date) as month,
+        $group_by as period,
         p.name as platform,
         sms.country,
-        SUM(sms.followers) as monthly_followers,
-        SUM(sms.engagements) as monthly_engagements
+        SUM(sms.followers) as period_followers,
+        SUM(sms.engagements) as period_engagements
     FROM social_media_daily_stats sms
     JOIN social_media_platforms p ON sms.platform_id = p.id
-    WHERE stat_date >= date('now', '-6 months')
-    GROUP BY strftime('%Y-%m', stat_date), p.name, sms.country
-    ORDER BY month ASC, p.name, sms.country
-");
+    WHERE $trends_where_clause
+    GROUP BY $group_by, p.name, sms.country
+    ORDER BY period ASC, p.name, sms.country
+", $trends_params);
 
 // Prepare data for charts
 $platform_colors = [
@@ -199,25 +268,67 @@ foreach ($platform_country_stats as $stat) {
     $platform_country_matrix[$platform][$country] = $stat;
 }
 
-// Prepare monthly trends data
-$monthly_platform_data = [];
-$monthly_country_data = [];
+// Prepare dynamic trends data
+$period_platform_data = [];
+$period_country_data = [];
+$all_periods = [];
+
 foreach ($monthly_trends as $trend) {
-    $month = $trend['month'];
+    $period = $trend['period'];
     $platform = $trend['platform'];
     $country = $trend['country'];
     
-    // Platform trends
-    if (!isset($monthly_platform_data[$platform])) {
-        $monthly_platform_data[$platform] = [];
+    // Collect all unique periods
+    if (!in_array($period, $all_periods)) {
+        $all_periods[] = $period;
     }
-    $monthly_platform_data[$platform][$month] = $trend['monthly_followers'];
+    
+    // Platform trends
+    if (!isset($period_platform_data[$platform])) {
+        $period_platform_data[$platform] = [];
+    }
+    $period_platform_data[$platform][$period] = $trend['period_followers'];
     
     // Country trends
-    if (!isset($monthly_country_data[$country])) {
-        $monthly_country_data[$country] = [];
+    if (!isset($period_country_data[$country])) {
+        $period_country_data[$country] = [];
     }
-    $monthly_country_data[$country][$month] = $trend['monthly_followers'];
+    $period_country_data[$country][$period] = $trend['period_followers'];
+}
+
+// Sort periods chronologically
+usort($all_periods, function($a, $b) use ($trend_interval) {
+    if ($trend_interval === 'quarterly') {
+        // Convert Q1-2024, Q2-2024 format for sorting
+        $a_parts = explode('-Q', $a);
+        $b_parts = explode('-Q', $b);
+        return ($a_parts[0] * 4 + $a_parts[1]) <=> ($b_parts[0] * 4 + $b_parts[1]);
+    }
+    return $a <=> $b;
+});
+
+// Format period labels based on interval
+$formatted_periods = [];
+foreach ($all_periods as $period) {
+    switch ($trend_interval) {
+        case 'daily':
+            $formatted_periods[] = date('M j', strtotime($period));
+            break;
+        case 'weekly':
+            $parts = explode('-', $period);
+            $formatted_periods[] = 'Week ' . $parts[1] . ' ' . $parts[0];
+            break;
+        case 'monthly':
+            $formatted_periods[] = date('M Y', strtotime($period . '-01'));
+            break;
+        case 'quarterly':
+            $parts = explode('-Q', $period);
+            $formatted_periods[] = 'Q' . $parts[1] . ' ' . $parts[0];
+            break;
+        case 'yearly':
+            $formatted_periods[] = $period;
+            break;
+    }
 }
 ?>
 
@@ -266,6 +377,9 @@ foreach ($monthly_trends as $trend) {
                         <option value="last_month" <?php echo $date_range === 'last_month' ? 'selected' : ''; ?>>Last Calendar Month</option>
                         <option value="last_3_months" <?php echo $date_range === 'last_3_months' ? 'selected' : ''; ?>>Last 3 Months</option>
                         <option value="last_6_months" <?php echo $date_range === 'last_6_months' ? 'selected' : ''; ?>>Last 6 Months</option>
+                        <option value="last_year" <?php echo $date_range === 'last_year' ? 'selected' : ''; ?>>Last Year</option>
+                        <option value="last_2_years" <?php echo $date_range === 'last_2_years' ? 'selected' : ''; ?>>Last 2 Years</option>
+                        <option value="last_5_years" <?php echo $date_range === 'last_5_years' ? 'selected' : ''; ?>>Last 5 Years</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -394,8 +508,9 @@ foreach ($monthly_trends as $trend) {
         <!-- Platform Growth Trends -->
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">Platform Growth Trends</h6>
+                    <span class="badge bg-info"><?php echo ucfirst($trend_interval); ?> View</span>
                 </div>
                 <div class="card-body">
                     <div class="chart-container line">
@@ -425,8 +540,9 @@ foreach ($monthly_trends as $trend) {
         <!-- Country Growth Trends -->
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">Country Growth Trends</h6>
+                    <span class="badge bg-info"><?php echo ucfirst($trend_interval); ?> View</span>
                 </div>
                 <div class="card-body">
                     <div class="chart-container line">
@@ -563,17 +679,16 @@ new Chart(platformCountryCtx, {
 // Platform Growth Trends Chart
 const platformGrowthCtx = document.getElementById('platformGrowthChart').getContext('2d');
 const platformGrowthData = {
-    labels: <?php echo json_encode(array_unique(array_column($monthly_trends, 'month'))); ?>,
+    labels: <?php echo json_encode($formatted_periods); ?>,
     datasets: [
         <?php foreach ($platforms as $platform): ?>
         {
             label: '<?php echo $platform['name']; ?>',
             data: [
                 <?php 
-                $months = array_unique(array_column($monthly_trends, 'month'));
-                foreach ($months as $month): 
-                    $value = isset($monthly_platform_data[$platform['name']][$month]) 
-                        ? $monthly_platform_data[$platform['name']][$month] 
+                foreach ($all_periods as $period): 
+                    $value = isset($period_platform_data[$platform['name']][$period]) 
+                        ? $period_platform_data[$platform['name']][$period] 
                         : 0;
                     echo $value . ',';
                 endforeach; 
@@ -601,7 +716,7 @@ new Chart(platformGrowthCtx, {
             },
             title: {
                 display: true,
-                text: 'Monthly Follower Growth by Platform'
+                text: '<?php echo ucfirst($trend_interval); ?> Follower Growth by Platform'
             }
         },
         scales: {
@@ -688,17 +803,16 @@ new Chart(countryPlatformCtx, {
 // Country Growth Trends Chart
 const countryGrowthCtx = document.getElementById('countryGrowthChart').getContext('2d');
 const countryGrowthData = {
-    labels: <?php echo json_encode(array_unique(array_column($monthly_trends, 'month'))); ?>,
+    labels: <?php echo json_encode($formatted_periods); ?>,
     datasets: [
         <?php foreach ($countries as $country): ?>
         {
             label: '<?php echo $country; ?>',
             data: [
                 <?php 
-                $months = array_unique(array_column($monthly_trends, 'month'));
-                foreach ($months as $month): 
-                    $value = isset($monthly_country_data[$country][$month]) 
-                        ? $monthly_country_data[$country][$month] 
+                foreach ($all_periods as $period): 
+                    $value = isset($period_country_data[$country][$period]) 
+                        ? $period_country_data[$country][$period] 
                         : 0;
                     echo $value . ',';
                 endforeach; 
@@ -726,7 +840,7 @@ new Chart(countryGrowthCtx, {
             },
             title: {
                 display: true,
-                text: 'Monthly Follower Growth by Country'
+                text: '<?php echo ucfirst($trend_interval); ?> Follower Growth by Country'
             }
         },
         scales: {
