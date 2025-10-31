@@ -38,7 +38,7 @@ if ($poster_filter) {
 
 $where_clause = implode(" AND ", $where_conditions);
 
-// Get comprehensive poster statistics
+// Get comprehensive poster statistics with payment info
 $sql = "
     SELECT 
         p.name as poster_name,
@@ -51,15 +51,54 @@ $sql = "
         MIN(j.post_date) as first_post,
         MAX(j.post_date) as last_post,
         COUNT(DISTINCT j.website) as websites_worked_on,
-        (SELECT website FROM job_postings WHERE poster_name = p.name GROUP BY website ORDER BY SUM(job_count) DESC LIMIT 1) as top_website
+        (SELECT website FROM job_postings WHERE poster_name = p.name GROUP BY website ORDER BY SUM(job_count) DESC LIMIT 1) as top_website,
+        ps.jobs_per_payment,
+        ps.payment_amount,
+        ps.currency
     FROM posters p
     LEFT JOIN job_postings j ON p.name = j.poster_name AND $where_clause
+    LEFT JOIN payment_settings ps ON p.name = ps.poster_name
     WHERE p.is_active = 1
     GROUP BY p.id, p.name
     ORDER BY total_jobs DESC
 ";
 
 $poster_stats = db_fetch_all($sql, $params);
+
+// Calculate payment metrics
+$payment_metrics = [];
+$total_earnings = 0;
+$total_potential_earnings = 0;
+
+foreach ($poster_stats as $stat) {
+    if ($stat['total_jobs'] > 0 && $stat['jobs_per_payment'] > 0) {
+        $payments_earned = floor($stat['total_jobs'] / $stat['jobs_per_payment']);
+        $earnings = $payments_earned * $stat['payment_amount'];
+        $remaining_jobs = $stat['total_jobs'] % $stat['jobs_per_payment'];
+        $progress_to_next = $stat['jobs_per_payment'] > 0 ? ($remaining_jobs / $stat['jobs_per_payment']) * 100 : 0;
+        
+        $payment_metrics[$stat['poster_name']] = [
+            'payments_earned' => $payments_earned,
+            'earnings' => $earnings,
+            'remaining_jobs' => $remaining_jobs,
+            'progress_to_next' => $progress_to_next,
+            'jobs_per_payment' => $stat['jobs_per_payment'],
+            'payment_amount' => $stat['payment_amount']
+        ];
+        
+        $total_earnings += $earnings;
+        $total_potential_earnings += $stat['total_jobs'] * ($stat['payment_amount'] / $stat['jobs_per_payment']);
+    } else {
+        $payment_metrics[$stat['poster_name']] = [
+            'payments_earned' => 0,
+            'earnings' => 0,
+            'remaining_jobs' => $stat['total_jobs'] ?? 0,
+            'progress_to_next' => 0,
+            'jobs_per_payment' => $stat['jobs_per_payment'] ?? 0,
+            'payment_amount' => $stat['payment_amount'] ?? 0
+        ];
+    }
+}
 
 // Get performance trends (last 3 months for comparison)
 $trend_start = date('Y-m-d', strtotime($start_date . ' -3 months'));
@@ -122,7 +161,7 @@ foreach ($poster_stats as $stat) {
 
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Poster Performance Analytics</h1>
+        <h1 class="h2">Poster Performance & Payment Analytics</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
             <span class="text-muted"><?php echo date('F j, Y'); ?></span>
         </div>
@@ -173,65 +212,81 @@ foreach ($poster_stats as $stat) {
         </div>
     </div>
 
-    <!-- Performance Summary Cards -->
+    <!-- Payment Summary Cards -->
     <div class="row mb-4">
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
             <div class="card stat-card h-100">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Total Posters</h6>
-                    <h3 class="text-primary"><?php echo count($poster_stats); ?></h3>
-                    <small class="text-muted">Active Team</small>
+                    <h6 class="card-title">Total Earnings</h6>
+                    <h3 class="text-success">$<?php echo number_format($total_earnings, 2); ?></h3>
+                    <small class="text-muted">Actual Payments</small>
                 </div>
             </div>
         </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
             <div class="card stat-card h-100">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Total Jobs</h6>
-                    <h3 class="text-success"><?php echo array_sum(array_column($poster_stats, 'total_jobs')); ?></h3>
-                    <small class="text-muted">All Posters</small>
+                    <h6 class="card-title">Potential Earnings</h6>
+                    <h3 class="text-info">$<?php echo number_format($total_potential_earnings, 2); ?></h3>
+                    <small class="text-muted">If all jobs paid</small>
                 </div>
             </div>
         </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
             <div class="card stat-card h-100">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Avg Jobs/Poster</h6>
-                    <h3 class="text-info"><?php echo count($poster_stats) > 0 ? number_format(array_sum(array_column($poster_stats, 'total_jobs')) / count($poster_stats), 1) : 0; ?></h3>
+                    <h6 class="card-title">Payment Rate</h6>
+                    <h3 class="text-warning"><?php echo $total_earnings > 0 ? number_format(($total_earnings / $total_potential_earnings) * 100, 1) : 0; ?>%</h3>
+                    <small class="text-muted">Efficiency</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Avg Payment</h6>
+                    <h3 class="text-primary">$<?php echo count($payment_metrics) > 0 ? number_format(array_sum(array_column($payment_metrics, 'payment_amount')) / count($payment_metrics), 2) : 0; ?></h3>
                     <small class="text-muted">Per Poster</small>
                 </div>
             </div>
         </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
             <div class="card stat-card h-100">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Top Performer</h6>
-                    <h3 class="text-warning" style="font-size: 1.1rem;"><?php echo !empty($poster_stats) ? (strlen($poster_stats[0]['poster_name']) > 12 ? substr($poster_stats[0]['poster_name'], 0, 12) . '...' : $poster_stats[0]['poster_name']) : 'N/A'; ?></h3>
-                    <small class="text-muted">Most Jobs</small>
+                    <h6 class="card-title">Top Earner</h6>
+                    <h3 class="text-danger" style="font-size: 1.1rem;">
+                        <?php 
+                        if (!empty($payment_metrics)) {
+                            $top_earner = '';
+                            $max_earnings = 0;
+                            foreach ($payment_metrics as $poster => $metrics) {
+                                if ($metrics['earnings'] > $max_earnings) {
+                                    $max_earnings = $metrics['earnings'];
+                                    $top_earner = $poster;
+                                }
+                            }
+                            echo strlen($top_earner) > 12 ? substr($top_earner, 0, 12) . '...' : $top_earner;
+                        } else {
+                            echo 'N/A';
+                        }
+                        ?>
+                    </h3>
+                    <small class="text-muted">Highest Earnings</small>
                 </div>
             </div>
         </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
             <div class="card stat-card h-100">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Avg Consistency</h6>
-                    <h3 class="text-danger"><?php echo !empty($performance_metrics) ? number_format(array_sum(array_column($performance_metrics, 'consistency_score')) / count($performance_metrics), 1) . '%' : '0%'; ?></h3>
-                    <small class="text-muted">Team Average</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Active Days</h6>
-                    <h3 class="text-dark"><?php echo !empty($poster_stats) ? max(array_column($poster_stats, 'posting_days')) : 0; ?></h3>
-                    <small class="text-muted">Most Active</small>
+                    <h6 class="card-title">Total Payments</h6>
+                    <h3 class="text-dark"><?php echo array_sum(array_column($payment_metrics, 'payments_earned')); ?></h3>
+                    <small class="text-muted">Payments Made</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Charts Row -->
+    <!-- Charts Row - First Row -->
     <div class="row mb-4">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
@@ -259,6 +314,34 @@ foreach ($poster_stats as $stat) {
         </div>
     </div>
 
+    <!-- Charts Row - Second Row -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">Earnings Distribution</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container bar">
+                        <canvas id="earningsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">Payment Progress</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container doughnut">
+                        <canvas id="paymentProgressChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Performance Tiers -->
     <div class="card mb-4">
         <div class="card-header">
@@ -268,22 +351,28 @@ foreach ($poster_stats as $stat) {
             <div class="row">
                 <?php
                 $tiers = [
-                    'elite' => ['count' => 0, 'color' => 'success', 'jobs' => 0],
-                    'excellent' => ['count' => 0, 'color' => 'info', 'jobs' => 0],
-                    'good' => ['count' => 0, 'color' => 'warning', 'jobs' => 0],
-                    'average' => ['count' => 0, 'color' => 'primary', 'jobs' => 0],
-                    'needs_improvement' => ['count' => 0, 'color' => 'danger', 'jobs' => 0]
+                    'elite' => ['count' => 0, 'color' => 'success', 'jobs' => 0, 'earnings' => 0],
+                    'excellent' => ['count' => 0, 'color' => 'info', 'jobs' => 0, 'earnings' => 0],
+                    'good' => ['count' => 0, 'color' => 'warning', 'jobs' => 0, 'earnings' => 0],
+                    'average' => ['count' => 0, 'color' => 'primary', 'jobs' => 0, 'earnings' => 0],
+                    'needs_improvement' => ['count' => 0, 'color' => 'danger', 'jobs' => 0, 'earnings' => 0]
                 ];
                 
                 foreach ($performance_metrics as $poster_name => $metrics) {
                     $tier = $metrics['performance_tier'];
                     $tiers[$tier]['count']++;
-                    // Find jobs for this poster
+                    
+                    // Find jobs and earnings for this poster
                     foreach ($poster_stats as $stat) {
                         if ($stat['poster_name'] === $poster_name) {
                             $tiers[$tier]['jobs'] += $stat['total_jobs'];
                             break;
                         }
+                    }
+                    
+                    // Find earnings for this poster
+                    if (isset($payment_metrics[$poster_name])) {
+                        $tiers[$tier]['earnings'] += $payment_metrics[$poster_name]['earnings'];
                     }
                 }
                 ?>
@@ -296,11 +385,132 @@ foreach ($poster_stats as $stat) {
                                 <h6 class="text-capitalize text-<?php echo $data['color']; ?>" style="font-size: 0.9rem;">
                                     <?php echo str_replace('_', ' ', $tier); ?>
                                 </h6>
-                                <small class="text-muted"><?php echo $data['jobs']; ?> Jobs</small>
+                                <small class="text-muted">
+                                    <?php echo $data['jobs']; ?> Jobs<br>
+                                    $<?php echo number_format($data['earnings'], 2); ?>
+                                </small>
                             </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Country Distribution by Poster -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0">Country Distribution by Poster</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Poster</th>
+                            <th>Uganda</th>
+                            <th>Kenya</th>
+                            <th>Tanzania</th>
+                            <th>Rwanda</th>
+                            <th>Zambia</th>
+                            <th>Other</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $country_totals = [
+                            'Uganda' => 0,
+                            'Kenya' => 0,
+                            'Tanzania' => 0,
+                            'Rwanda' => 0,
+                            'Zambia' => 0,
+                            'Other' => 0
+                        ];
+                        
+                        foreach ($poster_stats as $poster): 
+                            $poster_countries = array_filter($country_distribution, function($item) use ($poster) {
+                                return $item['poster_name'] === $poster['poster_name'];
+                            });
+                            
+                            $country_data = [
+                                'Uganda' => 0,
+                                'Kenya' => 0,
+                                'Tanzania' => 0,
+                                'Rwanda' => 0,
+                                'Zambia' => 0,
+                                'Other' => 0
+                            ];
+                            
+                            foreach ($poster_countries as $pc) {
+                                $country_data[$pc['country']] = $pc['jobs'];
+                                $country_totals[$pc['country']] += $pc['jobs'];
+                            }
+                            
+                            $poster_total = array_sum($country_data);
+                        ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($poster['poster_name']); ?></strong></td>
+                                <td>
+                                    <?php if ($country_data['Uganda'] > 0): ?>
+                                        <span class="badge bg-primary"><?php echo $country_data['Uganda']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($country_data['Kenya'] > 0): ?>
+                                        <span class="badge bg-success"><?php echo $country_data['Kenya']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($country_data['Tanzania'] > 0): ?>
+                                        <span class="badge bg-warning"><?php echo $country_data['Tanzania']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($country_data['Rwanda'] > 0): ?>
+                                        <span class="badge bg-info"><?php echo $country_data['Rwanda']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($country_data['Zambia'] > 0): ?>
+                                        <span class="badge bg-danger"><?php echo $country_data['Zambia']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($country_data['Other'] > 0): ?>
+                                        <span class="badge bg-secondary"><?php echo $country_data['Other']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <strong class="text-primary"><?php echo $poster_total; ?></strong>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <!-- Totals Row -->
+                        <tr class="table-warning">
+                            <td><strong>Total</strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Uganda']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Kenya']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Tanzania']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Rwanda']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Zambia']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Other']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo array_sum($country_totals); ?></strong></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -323,15 +533,16 @@ foreach ($poster_stats as $stat) {
                             <th>Avg Jobs/Post</th>
                             <th>Active Days</th>
                             <th>Consistency</th>
+                            <th>Payments Earned</th>
+                            <th>Total Earnings</th>
                             <th>Websites</th>
                             <th>Top Country</th>
-                            <th>First Post</th>
-                            <th>Last Post</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($poster_stats as $stat): 
                             $metrics = $performance_metrics[$stat['poster_name']] ?? [];
+                            $payment = $payment_metrics[$stat['poster_name']] ?? [];
                             $tier = $metrics['performance_tier'] ?? 'needs_improvement';
                             $tier_colors = [
                                 'elite' => 'success',
@@ -389,16 +600,18 @@ foreach ($poster_stats as $stat) {
                                     <?php endif; ?>
                                 </td>
                                 <td>
+                                    <span class="badge bg-<?php echo $payment['payments_earned'] > 0 ? 'success' : 'secondary'; ?>">
+                                        <?php echo $payment['payments_earned'] ?? 0; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong class="text-success">$<?php echo number_format($payment['earnings'] ?? 0, 2); ?></strong>
+                                </td>
+                                <td>
                                     <span class="badge bg-info"><?php echo $stat['websites_worked_on'] ?? 0; ?></span>
                                 </td>
                                 <td>
                                     <small class="text-muted"><?php echo $top_country; ?></small>
-                                </td>
-                                <td>
-                                    <small><?php echo $stat['first_post'] ? date('M j', strtotime($stat['first_post'])) : 'N/A'; ?></small>
-                                </td>
-                                <td>
-                                    <small><?php echo $stat['last_post'] ? date('M j', strtotime($stat['last_post'])) : 'N/A'; ?></small>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -482,6 +695,118 @@ new Chart(countryCtx, {
         datasets: [{
             data: Object.values(countryData),
             backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF8A65']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    boxWidth: 12,
+                    font: {
+                        size: 11
+                    }
+                }
+            }
+        },
+        cutout: '50%'
+    }
+});
+
+// Earnings Distribution Chart
+const earningsCtx = document.getElementById('earningsChart').getContext('2d');
+new Chart(earningsCtx, {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($poster_stats, 'poster_name')); ?>,
+        datasets: [{
+            label: 'Actual Earnings ($)',
+            data: <?php echo json_encode(array_column($payment_metrics, 'earnings')); ?>,
+            backgroundColor: '#28a745',
+            borderColor: '#1e7e34',
+            borderWidth: 1
+        }, {
+            label: 'Potential Earnings ($)',
+            data: <?php 
+                $potential_earnings = [];
+                foreach ($poster_stats as $stat) {
+                    $potential = $stat['total_jobs'] * ($stat['payment_amount'] / max($stat['jobs_per_payment'], 1));
+                    $potential_earnings[] = $potential;
+                }
+                echo json_encode($potential_earnings);
+            ?>,
+            backgroundColor: '#17a2b8',
+            borderColor: '#138496',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    font: {
+                        size: 11
+                    },
+                    callback: function(value) {
+                        return '$' + value;
+                    }
+                }
+            },
+            x: {
+                ticks: {
+                    font: {
+                        size: 11
+                    },
+                    maxRotation: 45
+                }
+            }
+        }
+    }
+});
+
+// Payment Progress Chart
+const paymentCtx = document.getElementById('paymentProgressChart').getContext('2d');
+
+// Prepare payment progress data
+const progressData = {
+    'Completed Payments': <?php echo array_sum(array_column($payment_metrics, 'payments_earned')); ?>,
+    'In Progress': <?php 
+        $in_progress = 0;
+        foreach ($payment_metrics as $metrics) {
+            if ($metrics['remaining_jobs'] > 0) $in_progress++;
+        }
+        echo $in_progress;
+    ?>,
+    'No Activity': <?php 
+        $no_activity = 0;
+        foreach ($poster_stats as $stat) {
+            if ($stat['total_jobs'] == 0) $no_activity++;
+        }
+        echo $no_activity;
+    ?>
+};
+
+new Chart(paymentCtx, {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(progressData),
+        datasets: [{
+            data: Object.values(progressData),
+            backgroundColor: ['#28a745', '#ffc107', '#6c757d']
         }]
     },
     options: {

@@ -12,11 +12,34 @@ if ($_POST && isset($_POST['action'])) {
             $stmt->bindValue(1, $name, SQLITE3_TEXT);
             if ($stmt->execute()) {
                 $success = "Poster '$name' added successfully!";
+                
+                // Create default payment settings for this poster
+                db_query("INSERT OR IGNORE INTO payment_settings (poster_name, jobs_per_payment, payment_amount) VALUES (?, ?, ?)", 
+                        [$name, 50, 100.00]);
             } else {
                 $error = "Failed to add poster '$name'.";
             }
         } catch (Exception $e) {
             $error = "Error adding poster: " . $e->getMessage();
+        }
+    }
+    
+    // Handle payment settings update
+    if ($_POST['action'] === 'update_payment' && !empty($_POST['poster_name'])) {
+        $poster_name = trim($_POST['poster_name']);
+        $jobs_per_payment = intval($_POST['jobs_per_payment']);
+        $payment_amount = floatval($_POST['payment_amount']);
+        
+        try {
+            $sql = "INSERT OR REPLACE INTO payment_settings (poster_name, jobs_per_payment, payment_amount, updated_at) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)";
+            if (db_query($sql, [$poster_name, $jobs_per_payment, $payment_amount])) {
+                $success = "Payment settings updated for $poster_name!";
+            } else {
+                $error = "Failed to update payment settings.";
+            }
+        } catch (Exception $e) {
+            $error = "Error updating payment settings: " . $e->getMessage();
         }
     }
 }
@@ -65,18 +88,36 @@ if (isset($_GET['activate'])) {
     }
 }
 
-// Get all posters
+// Get all posters with their payment settings
 $posters = db_fetch_all("
     SELECT p.*, 
+           ps.jobs_per_payment,
+           ps.payment_amount,
+           ps.currency,
+           ps.is_active as payment_active,
            (SELECT COUNT(*) FROM job_postings jp WHERE jp.poster_name = p.name) as job_count
     FROM posters p 
+    LEFT JOIN payment_settings ps ON p.name = ps.poster_name
     ORDER BY p.is_active DESC, p.name ASC
 ");
+
+// Get current month stats for payment calculations
+$current_month_start = date('Y-m-01');
+$current_month_end = date('Y-m-t');
+$monthly_stats = db_fetch_all("
+    SELECT 
+        poster_name,
+        SUM(job_count) as monthly_jobs,
+        COUNT(DISTINCT post_date) as active_days
+    FROM job_postings 
+    WHERE post_date BETWEEN ? AND ?
+    GROUP BY poster_name
+", [$current_month_start, $current_month_end]);
 ?>
 
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Manage Posters</h1>
+        <h1 class="h2">Manage Posters & Payment Settings</h1>
         <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='job_entry.php'">
             <i class="fas fa-arrow-left"></i> Back to Job Entry
         </button>
@@ -98,7 +139,7 @@ $posters = db_fetch_all("
 
     <div class="row">
         <!-- Add New Poster Form -->
-        <div class="col-md-5">
+        <div class="col-md-4">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h6 class="mb-0"><i class="fas fa-user-plus"></i> Add New Poster</h6>
@@ -118,36 +159,90 @@ $posters = db_fetch_all("
                 </div>
             </div>
 
+            <!-- Payment Settings Form -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-money-bill-wave"></i> Payment Settings</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="paymentForm">
+                        <input type="hidden" name="action" value="update_payment">
+                        <div class="mb-3">
+                            <label class="form-label">Select Poster</label>
+                            <select name="poster_name" class="form-select" required onchange="loadPaymentSettings(this.value)">
+                                <option value="">Choose a poster...</option>
+                                <?php foreach ($posters as $poster): ?>
+                                    <?php if ($poster['is_active']): ?>
+                                        <option value="<?php echo htmlspecialchars($poster['name']); ?>">
+                                            <?php echo htmlspecialchars($poster['name']); ?>
+                                        </option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Jobs per Payment</label>
+                            <input type="number" name="jobs_per_payment" class="form-control" min="1" value="100" required>
+                            <div class="form-text">Number of jobs required for one payment</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Payment Amount ($)</label>
+                            <input type="number" name="payment_amount" class="form-control" min="0" step="0.01" value="18000.00" required>
+                            <div class="form-text">Amount paid when target is reached</div>
+                        </div>
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="fas fa-cog"></i> Update Payment Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- Quick Stats -->
             <div class="card mt-4">
                 <div class="card-header">
-                    <h6 class="mb-0">Posters Statistics</h6>
+                    <h6 class="mb-0">Monthly Summary</h6>
                 </div>
                 <div class="card-body">
                     <?php
-                    $total_posters = count($posters);
-                    $active_posters = count(array_filter($posters, function($p) { return $p['is_active']; }));
-                    $inactive_posters = $total_posters - $active_posters;
+                    $total_posters = count(array_filter($posters, function($p) { return $p['is_active']; }));
+                    $total_monthly_jobs = array_sum(array_column($monthly_stats, 'monthly_jobs'));
+                    $estimated_payments = 0;
+                    
+                    foreach ($monthly_stats as $stat) {
+                        $poster_settings = array_filter($posters, function($p) use ($stat) { 
+                            return $p['name'] === $stat['poster_name'] && $p['is_active']; 
+                        });
+                        if (!empty($poster_settings)) {
+                            $settings = current($poster_settings);
+                            if ($settings['jobs_per_payment'] > 0) {
+                                $estimated_payments += floor($stat['monthly_jobs'] / $settings['jobs_per_payment']) * $settings['payment_amount'];
+                            }
+                        }
+                    }
                     ?>
                     <div class="row text-center">
-                        <div class="col-6">
+                        <div class="col-6 mb-3">
                             <h4 class="text-primary"><?php echo $total_posters; ?></h4>
-                            <small class="text-muted">Total Posters</small>
+                            <small class="text-muted">Active Posters</small>
                         </div>
-                        <div class="col-6">
-                            <h4 class="text-success"><?php echo $active_posters; ?></h4>
-                            <small class="text-muted">Active</small>
+                        <div class="col-6 mb-3">
+                            <h4 class="text-success"><?php echo $total_monthly_jobs; ?></h4>
+                            <small class="text-muted">This Month Jobs</small>
+                        </div>
+                        <div class="col-12">
+                            <h4 class="text-warning">UGX: <?php echo number_format($estimated_payments, 2); ?></h4>
+                            <small class="text-muted">Estimated Payments</small>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Posters List -->
-        <div class="col-md-7">
+        <!-- Posters List with Payment Info -->
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">All Posters</h6>
+                    <h6 class="mb-0">All Posters & Payment Status</h6>
                     <span class="badge bg-primary"><?php echo count($posters); ?> posters</span>
                 </div>
                 <div class="card-body">
@@ -163,12 +258,23 @@ $posters = db_fetch_all("
                                     <tr>
                                         <th>Name</th>
                                         <th>Jobs Posted</th>
+                                        <th>This Month</th>
+                                        <th>Payment Rate</th>
+                                        <th>Earnings</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($posters as $poster): ?>
+                                    <?php foreach ($posters as $poster): 
+                                        $monthly_data = array_filter($monthly_stats, function($m) use ($poster) { 
+                                            return $m['poster_name'] === $poster['name']; 
+                                        });
+                                        $current_month_jobs = !empty($monthly_data) ? current($monthly_data)['monthly_jobs'] : 0;
+                                        $payments_earned = $poster['jobs_per_payment'] > 0 ? floor($current_month_jobs / $poster['jobs_per_payment']) : 0;
+                                        $earnings = $payments_earned * $poster['payment_amount'];
+                                        $progress = $poster['jobs_per_payment'] > 0 ? ($current_month_jobs / $poster['jobs_per_payment']) * 100 : 0;
+                                    ?>
                                         <tr>
                                             <td>
                                                 <strong><?php echo htmlspecialchars($poster['name']); ?></strong>
@@ -186,6 +292,33 @@ $posters = db_fetch_all("
                                                 <span class="badge bg-info"><?php echo $poster['job_count']; ?></span>
                                             </td>
                                             <td>
+                                                <span class="badge bg-<?php echo $current_month_jobs > 0 ? 'success' : 'secondary'; ?>">
+                                                    <?php echo $current_month_jobs; ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <small>
+                                                    <?php echo $poster['jobs_per_payment'] ?? 'N/A'; ?> jobs = $<?php echo number_format($poster['payment_amount'] ?? 0, 2); ?>
+                                                </small>
+                                                <?php if ($poster['jobs_per_payment'] > 0): ?>
+                                                    <div class="progress mt-1" style="height: 5px;">
+                                                        <div class="progress-bar bg-<?php echo $progress >= 100 ? 'success' : ($progress >= 50 ? 'warning' : 'info'); ?>" 
+                                                             style="width: <?php echo min($progress, 100); ?>%">
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        <?php echo $current_month_jobs; ?>/<?php echo $poster['jobs_per_payment']; ?>
+                                                    </small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <strong class="text-success">UGX: <?php echo number_format($earnings, 2); ?></strong>
+                                                <?php if ($payments_earned > 0): ?>
+                                                    <br>
+                                                    <small class="text-muted"><?php echo $payments_earned; ?> payment(s)</small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
                                                 <?php if ($poster['is_active']): ?>
                                                     <span class="badge bg-success">Active</span>
                                                 <?php else: ?>
@@ -194,6 +327,12 @@ $posters = db_fetch_all("
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-info" 
+                                                            onclick="editPaymentSettings('<?php echo htmlspecialchars($poster['name']); ?>', <?php echo $poster['jobs_per_payment'] ?? 50; ?>, <?php echo $poster['payment_amount'] ?? 100.00; ?>)"
+                                                            title="Edit Payment">
+                                                        <i class="fas fa-money-bill"></i>
+                                                    </button>
+                                                    
                                                     <?php if (!$poster['is_active']): ?>
                                                         <a href="?activate=<?php echo $poster['id']; ?>" class="btn btn-outline-success" title="Activate">
                                                             <i class="fas fa-check"></i>
@@ -226,68 +365,68 @@ $posters = db_fetch_all("
                 </div>
             </div>
 
-            <!-- Bulk Actions -->
+            <!-- Payment Summary -->
             <div class="card mt-4">
-                <div class="card-header">
-                    <h6 class="mb-0">Quick Actions</h6>
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Monthly Payment Summary</h6>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="job_entry.php" class="btn btn-outline-primary">
-                            <i class="fas fa-plus-circle"></i> Add Job Posts
-                        </a>
-                        <button type="button" class="btn btn-outline-info" onclick="window.location.reload()">
-                            <i class="fas fa-sync"></i> Refresh List
-                        </button>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Poster</th>
+                                    <th>This Month Jobs</th>
+                                    <th>Target</th>
+                                    <th>Progress</th>
+                                    <th>Payments Earned</th>
+                                    <th>Total Earnings</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $total_earnings = 0;
+                                foreach ($posters as $poster): 
+                                    if (!$poster['is_active']) continue;
+                                    
+                                    $monthly_data = array_filter($monthly_stats, function($m) use ($poster) { 
+                                        return $m['poster_name'] === $poster['name']; 
+                                    });
+                                    $current_month_jobs = !empty($monthly_data) ? current($monthly_data)['monthly_jobs'] : 0;
+                                    $payments_earned = $poster['jobs_per_payment'] > 0 ? floor($current_month_jobs / $poster['jobs_per_payment']) : 0;
+                                    $earnings = $payments_earned * $poster['payment_amount'];
+                                    $total_earnings += $earnings;
+                                    $progress = $poster['jobs_per_payment'] > 0 ? ($current_month_jobs / $poster['jobs_per_payment']) * 100 : 0;
+                                ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($poster['name']); ?></strong></td>
+                                        <td><?php echo $current_month_jobs; ?></td>
+                                        <td><?php echo $poster['jobs_per_payment'] ?? 'N/A'; ?></td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-<?php echo $progress >= 100 ? 'success' : ($progress >= 50 ? 'warning' : 'info'); ?>" 
+                                                     style="width: <?php echo min($progress, 100); ?>%">
+                                                    <?php echo number_format(min($progress, 100), 0); ?>%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php echo $payments_earned > 0 ? 'success' : 'secondary'; ?>">
+                                                <?php echo $payments_earned; ?>
+                                            </span>
+                                        </td>
+                                        <td><strong class="text-success">UGX: <?php echo number_format($earnings, 2); ?></strong></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <tr class="table-warning">
+                                    <td colspan="5" class="text-end"><strong>Total Estimated Payments:</strong></td>
+                                    <td><strong class="text-success">UGX: <?php echo number_format($total_earnings, 2); ?></strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="card mt-4">
-        <div class="card-header">
-            <h6 class="mb-0">Recent Poster Activity</h6>
-        </div>
-        <div class="card-body">
-            <?php
-            $recent_activity = db_fetch_all("
-                SELECT jp.poster_name, jp.website, jp.job_count, jp.post_date, jp.created_at
-                FROM job_postings jp
-                ORDER BY jp.created_at DESC
-                LIMIT 10
-            ");
-            ?>
-            
-            <?php if (empty($recent_activity)): ?>
-                <p class="text-muted">No recent job posting activity.</p>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>Poster</th>
-                                <th>Website</th>
-                                <th>Jobs</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($recent_activity as $activity): ?>
-                                <tr>
-                                    <td><strong><?php echo htmlspecialchars($activity['poster_name']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($activity['website']); ?></td>
-                                    <td><span class="badge bg-primary"><?php echo $activity['job_count']; ?></span></td>
-                                    <td><?php echo date('M j, Y', strtotime($activity['post_date'])); ?></td>
-                                    <td><small class="text-muted"><?php echo date('H:i', strtotime($activity['created_at'])); ?></small></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -309,6 +448,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 });
+
+// Load payment settings when poster is selected
+function loadPaymentSettings(posterName) {
+    // This would typically make an AJAX call to get the settings
+    // For now, we'll just update the form values based on known data
+    console.log('Loading settings for:', posterName);
+}
+
+// Quick edit payment settings
+function editPaymentSettings(posterName, jobsPerPayment, paymentAmount) {
+    document.querySelector('select[name="poster_name"]').value = posterName;
+    document.querySelector('input[name="jobs_per_payment"]').value = jobsPerPayment;
+    document.querySelector('input[name="payment_amount"]').value = paymentAmount;
+    
+    // Scroll to payment form
+    document.getElementById('paymentForm').scrollIntoView({ behavior: 'smooth' });
+}
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

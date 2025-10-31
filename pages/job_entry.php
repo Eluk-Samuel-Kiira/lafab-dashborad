@@ -3,8 +3,36 @@ require_once '../config.php';
 require_once '../includes/header.php';
 require_once '../includes/sidebar.php';
 
-// Handle form submission
-if ($_POST && !empty($_POST['website']) && !empty($_POST['poster_name'])) {
+// Initialize variables
+$success = '';
+$error = '';
+
+// Handle single delete request
+if (isset($_POST['delete_job_id'])) {
+    $delete_id = intval($_POST['delete_job_id']);
+    
+    try {
+        // Get the entry details before deleting for confirmation message
+        $entry = db_fetch_one("SELECT website, poster_name, post_date, job_count FROM job_postings WHERE id = ?", [$delete_id]);
+        
+        if ($entry) {
+            $sql = "DELETE FROM job_postings WHERE id = ?";
+            if (db_query($sql, [$delete_id])) {
+                $success = "Successfully deleted job posting: {$entry['poster_name']} posted {$entry['job_count']} jobs on {$entry['website']} for {$entry['post_date']}";
+            } else {
+                $error = "Error deleting job posting!";
+            }
+        } else {
+            $error = "Job posting not found!";
+        }
+        
+    } catch (Exception $e) {
+        $error = "Error deleting: " . $e->getMessage();
+    }
+}
+
+// Handle form submission for adding new jobs
+if ($_POST && !empty($_POST['website']) && !empty($_POST['poster_name']) && !isset($_POST['delete_job_id'])) {
     $website = $_POST['website'];
     $poster_name = trim($_POST['poster_name']);
     $job_count = intval($_POST['job_count']);
@@ -52,19 +80,18 @@ $posters = db_fetch_all("SELECT name FROM posters WHERE is_active = 1 ORDER BY n
 // Set default date to yesterday
 $default_date = date('Y-m-d', strtotime('-1 day'));
 
-// Get recent job postings (grouped by poster and date)
+// Get recent job postings (individual entries with IDs for deletion)
 $recent_jobs = db_fetch_all("
     SELECT 
+        id,
         website,
         poster_name,
         post_date,
-        SUM(job_count) as total_jobs,
-        COUNT(*) as entries_count,
-        MAX(created_at) as last_updated
+        job_count,
+        created_at
     FROM job_postings 
-    GROUP BY website, poster_name, post_date
-    ORDER BY post_date DESC, last_updated DESC 
-    LIMIT 15
+    ORDER BY post_date DESC, created_at DESC 
+    LIMIT 20
 ");
 ?>
 
@@ -81,14 +108,14 @@ $recent_jobs = db_fetch_all("
         </div>
     </div>
 
-    <?php if (isset($success)): ?>
+    <?php if (!empty($success)): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="fas fa-check-circle"></i> <?php echo $success; ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     
-    <?php if (isset($error)): ?>
+    <?php if (!empty($error)): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="fas fa-exclamation-triangle"></i> <?php echo $error; ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -172,11 +199,11 @@ $recent_jobs = db_fetch_all("
         </div>
     </div>
 
-    <!-- Recent Job Postings (Grouped) -->
+    <!-- Recent Job Postings with Delete Options -->
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0"><i class="fas fa-history"></i> Recent Job Postings</h6>
-            <span class="badge bg-primary">Grouped by Poster & Date</span>
+            <span class="badge bg-primary"><?php echo count($recent_jobs); ?> entries</span>
         </div>
         <div class="card-body">
             <?php if (empty($recent_jobs)): ?>
@@ -192,9 +219,9 @@ $recent_jobs = db_fetch_all("
                                 <th>Date</th>
                                 <th>Website</th>
                                 <th>Poster</th>
-                                <th>Total Jobs</th>
-                                <th>Entries</th>
-                                <th>Last Updated</th>
+                                <th>Jobs</th>
+                                <th>Created</th>
+                                <th width="80">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -213,19 +240,20 @@ $recent_jobs = db_fetch_all("
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge bg-success fs-6"><?php echo $job['total_jobs']; ?></span>
+                                        <span class="badge bg-success fs-6"><?php echo $job['job_count']; ?></span>
                                     </td>
                                     <td>
-                                        <?php if ($job['entries_count'] > 1): ?>
-                                            <span class="badge bg-warning" title="Multiple entries combined">
-                                                <i class="fas fa-layer-group me-1"></i><?php echo $job['entries_count']; ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-light text-dark">Single</span>
-                                        <?php endif; ?>
+                                        <small class="text-muted" title="<?php echo $job['created_at']; ?>">
+                                            <?php echo date('M j g:i A', strtotime($job['created_at'])); ?>
+                                        </small>
                                     </td>
                                     <td>
-                                        <small class="text-muted"><?php echo date('M j g:i A', strtotime($job['last_updated'])); ?></small>
+                                        <form method="POST" style="display: inline;" onsubmit="return confirmDelete(<?php echo $job['id']; ?>, '<?php echo htmlspecialchars($job['poster_name']); ?>', <?php echo $job['job_count']; ?>, '<?php echo htmlspecialchars($job['website']); ?>', '<?php echo $job['post_date']; ?>')">
+                                            <input type="hidden" name="delete_job_id" value="<?php echo $job['id']; ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Entry">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -235,39 +263,50 @@ $recent_jobs = db_fetch_all("
                 
                 <!-- Summary Stats -->
                 <div class="row mt-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card bg-light border-0">
                             <div class="card-body text-center py-2">
                                 <h6 class="mb-0 text-primary"><?php echo count($recent_jobs); ?></h6>
-                                <small class="text-muted">Unique Poster-Date Combinations</small>
+                                <small class="text-muted">Total Entries</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card bg-light border-0">
                             <div class="card-body text-center py-2">
                                 <h6 class="mb-0 text-success">
                                     <?php 
-                                    $total_jobs = array_sum(array_column($recent_jobs, 'total_jobs'));
+                                    $total_jobs = array_sum(array_column($recent_jobs, 'job_count'));
                                     echo $total_jobs;
                                     ?>
                                 </h6>
-                                <small class="text-muted">Total Jobs Posted</small>
+                                <small class="text-muted">Total Jobs</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="card bg-light border-0">
+                            <div class="card-body text-center py-2">
+                                <h6 class="mb-0 text-info">
+                                    <?php 
+                                    $unique_posters = count(array_unique(array_column($recent_jobs, 'poster_name')));
+                                    echo $unique_posters;
+                                    ?>
+                                </h6>
+                                <small class="text-muted">Unique Posters</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="card bg-light border-0">
                             <div class="card-body text-center py-2">
                                 <h6 class="mb-0 text-warning">
                                     <?php 
-                                    $multiple_entries = array_filter($recent_jobs, function($job) {
-                                        return $job['entries_count'] > 1;
-                                    });
-                                    echo count($multiple_entries);
+                                    $unique_dates = count(array_unique(array_column($recent_jobs, 'post_date')));
+                                    echo $unique_dates;
                                     ?>
                                 </h6>
-                                <small class="text-muted">Combined Entries</small>
+                                <small class="text-muted">Unique Dates</small>
                             </div>
                         </div>
                     </div>
@@ -312,6 +351,12 @@ function checkExistingEntries() {
         statsText.textContent = `If ${posterName} has existing posts for ${website} on ${postDate}, the job counts will be combined.`;
         statsDiv.classList.remove('d-none');
     }
+}
+
+// Confirm single delete - returns true/false for form submission
+function confirmDelete(id, posterName, jobCount, website, postDate) {
+    const formattedDate = new Date(postDate).toLocaleDateString();
+    return confirm(`Are you sure you want to delete this job posting?\n\nPoster: ${posterName}\nJobs: ${jobCount}\nWebsite: ${website}\nDate: ${formattedDate}`);
 }
 
 // Form validation
@@ -365,6 +410,32 @@ document.querySelector('select[name="website"]').addEventListener('change', chec
 .badge.fs-6 {
     font-size: 0.9em !important;
     padding: 0.5em 0.75em;
+}
+
+/* Style for the delete form to appear inline */
+form[style*="display: inline"] {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* Uniform delete button styling */
+.btn-outline-danger {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+    padding: 0.375rem 0.75rem;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    color: white;
+    transform: scale(1.05);
+}
+
+.table td {
+    vertical-align: middle;
 }
 </style>
 
