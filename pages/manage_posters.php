@@ -238,7 +238,7 @@ $monthly_stats = db_fetch_all("
             </div>
         </div>
 
-        <!-- Posters List with Payment Info -->
+        <!-- Posters List with Payment  -->
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
