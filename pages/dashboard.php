@@ -53,6 +53,31 @@ switch ($date_filter) {
         $end_date = $today;
         $period_label = 'This Week';
         break;
+    case 'last_week':
+        $start_date = date('Y-m-d', strtotime('monday last week'));
+        $end_date = date('Y-m-d', strtotime('sunday last week'));
+        $period_label = 'Last Week';
+        break;
+    case 'last_2weeks':
+        $start_date = date('Y-m-d', strtotime('monday last week -7 days'));
+        $end_date = $today;
+        $period_label = 'Last 2 Weeks';
+        break;
+    case 'last_month':
+        $start_date = date('Y-m-01', strtotime('last month'));
+        $end_date = date('Y-m-t', strtotime('last month'));
+        $period_label = 'Last Month';
+        break;
+    case 'last_2months':
+        $start_date = date('Y-m-01', strtotime('-2 months'));
+        $end_date = $today;
+        $period_label = 'Last 2 Months';
+        break;
+    case 'last_3months':
+        $start_date = date('Y-m-01', strtotime('-3 months'));
+        $end_date = $today;
+        $period_label = 'Last 3 Months';
+        break;
     case 'quarter':
         $start_date = date('Y-m-d', strtotime(date('Y').'-'.((ceil(date('n')/3)-1)*3+1).'-01'));
         $end_date = $today;
@@ -108,7 +133,7 @@ function getTotalJobs($start_date, $end_date = null, $country = '') {
     return $result['total'] ?? 0;
 }
 
-// Get all counts with filters
+// Get all counts with filters - these will now update based on the selected date range
 $daily_total = getTotalJobs($today, $today, $country_filter);
 $yesterday_total = getTotalJobs(date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day')), $country_filter);
 $two_days_total = getTotalJobs(date('Y-m-d', strtotime('-1 day')), $today, $country_filter);
@@ -117,6 +142,11 @@ $four_days_total = getTotalJobs(date('Y-m-d', strtotime('-3 days')), $today, $co
 $five_days_total = getTotalJobs(date('Y-m-d', strtotime('-4 days')), $today, $country_filter);
 $six_days_total = getTotalJobs(date('Y-m-d', strtotime('-5 days')), $today, $country_filter);
 $weekly_total = getTotalJobs(date('Y-m-d', strtotime('monday this week')), $today, $country_filter);
+$last_week_total = getTotalJobs(date('Y-m-d', strtotime('monday last week')), date('Y-m-d', strtotime('sunday last week')), $country_filter);
+$last_2weeks_total = getTotalJobs(date('Y-m-d', strtotime('monday last week -7 days')), $today, $country_filter);
+$last_month_total = getTotalJobs(date('Y-m-01', strtotime('last month')), date('Y-m-t', strtotime('last month')), $country_filter);
+$last_2months_total = getTotalJobs(date('Y-m-01', strtotime('-2 months')), $today, $country_filter);
+$last_3months_total = getTotalJobs(date('Y-m-01', strtotime('-3 months')), $today, $country_filter);
 $monthly_total = getTotalJobs(date('Y-m-01'), $today, $country_filter);
 $quarterly_total = getTotalJobs(date('Y-m-d', strtotime(date('Y').'-'.((ceil(date('n')/3)-1)*3+1).'-01')), $today, $country_filter);
 $yearly_total = getTotalJobs(date('Y-01-01'), $today, $country_filter);
@@ -128,6 +158,11 @@ $filtered_jobs = getJobCount($start_date, $end_date, $country_filter);
 $poster_sql = "SELECT poster_name, SUM(job_count) as total_jobs FROM job_postings WHERE post_date >= ?";
 $poster_params = [$start_date];
 
+if ($end_date) {
+    $poster_sql .= " AND post_date <= ?";
+    $poster_params[] = $end_date;
+}
+
 if ($country_filter) {
     $poster_sql .= " AND website LIKE ?";
     $poster_params[] = "%$country_filter%";
@@ -136,14 +171,62 @@ if ($country_filter) {
 $poster_sql .= " GROUP BY poster_name ORDER BY total_jobs DESC LIMIT 5";
 $poster_stats = db_fetch_all($poster_sql, $poster_params);
 
-// Get growth data
-$previous_start_date = date('Y-m-d', strtotime($start_date . ' -1 month'));
-$previous_end_date = date('Y-m-d', strtotime($end_date . ' -1 month'));
-$previous_total = getTotalJobs($previous_start_date, $previous_end_date, $country_filter);
+// Get growth data - compare with previous equivalent period
 $growth_percentage = 0;
+$current_total = getTotalJobs($start_date, $end_date, $country_filter);
+
+switch ($date_filter) {
+    case 'today':
+        $previous_start_date = date('Y-m-d', strtotime('-1 day'));
+        $previous_end_date = date('Y-m-d', strtotime('-1 day'));
+        break;
+    case 'yesterday':
+        $previous_start_date = date('Y-m-d', strtotime('-2 days'));
+        $previous_end_date = date('Y-m-d', strtotime('-2 days'));
+        break;
+    case 'week':
+        $previous_start_date = date('Y-m-d', strtotime('monday last week'));
+        $previous_end_date = date('Y-m-d', strtotime('sunday last week'));
+        break;
+    case 'last_week':
+        $previous_start_date = date('Y-m-d', strtotime('monday last week -7 days'));
+        $previous_end_date = date('Y-m-d', strtotime('sunday last week -7 days'));
+        break;
+    case 'last_2weeks':
+        $previous_start_date = date('Y-m-d', strtotime('monday last week -14 days'));
+        $previous_end_date = date('Y-m-d', strtotime('sunday last week -7 days'));
+        break;
+    case 'month':
+    case 'last_month':
+        $previous_start_date = date('Y-m-01', strtotime('-2 months'));
+        $previous_end_date = date('Y-m-t', strtotime('-2 months'));
+        break;
+    case 'last_2months':
+        $previous_start_date = date('Y-m-01', strtotime('-4 months'));
+        $previous_end_date = date('Y-m-t', strtotime('-3 months'));
+        break;
+    case 'last_3months':
+        $previous_start_date = date('Y-m-01', strtotime('-6 months'));
+        $previous_end_date = date('Y-m-t', strtotime('-4 months'));
+        break;
+    case 'quarter':
+        $previous_start_date = date('Y-m-d', strtotime(date('Y').'-'.((ceil(date('n')/3)-2)*3+1).'-01'));
+        $previous_end_date = date('Y-m-t', strtotime($previous_start_date . ' +2 months'));
+        break;
+    case 'year':
+        $previous_start_date = date('Y-01-01', strtotime('-1 year'));
+        $previous_end_date = date('Y-12-31', strtotime('-1 year'));
+        break;
+    default:
+        $previous_start_date = date('Y-m-d', strtotime($start_date . ' -1 month'));
+        $previous_end_date = date('Y-m-d', strtotime($end_date . ' -1 month'));
+        break;
+}
+
+$previous_total = getTotalJobs($previous_start_date, $previous_end_date, $country_filter);
 
 if ($previous_total > 0) {
-    $growth_percentage = (($monthly_total - $previous_total) / $previous_total) * 100;
+    $growth_percentage = (($current_total - $previous_total) / $previous_total) * 100;
 }
 
 // Get daily trends for line chart
@@ -181,6 +264,16 @@ $recent_params = [];
 if ($country_filter) {
     $recent_sql .= " AND website LIKE ?";
     $recent_params[] = "%$country_filter%";
+}
+
+if ($start_date) {
+    $recent_sql .= " AND post_date >= ?";
+    $recent_params[] = $start_date;
+}
+
+if ($end_date) {
+    $recent_sql .= " AND post_date <= ?";
+    $recent_params[] = $end_date;
 }
 
 $recent_sql .= " ORDER BY post_date DESC, created_at DESC LIMIT 20";
@@ -253,17 +346,26 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
                 <div class="col-lg-4 col-md-6">
                     <label class="form-label fw-semibold">Date Range</label>
                     <select name="date_range" class="form-select border-0 bg-light">
-                        <option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option>
-                        <option value="yesterday" <?php echo $date_filter === 'yesterday' ? 'selected' : ''; ?>>Yesterday</option>
-                        <option value="2days" <?php echo $date_filter === '2days' ? 'selected' : ''; ?>>Last 2 Days</option>
-                        <option value="3days" <?php echo $date_filter === '3days' ? 'selected' : ''; ?>>Last 3 Days</option>
-                        <option value="4days" <?php echo $date_filter === '4days' ? 'selected' : ''; ?>>Last 4 Days</option>
-                        <option value="5days" <?php echo $date_filter === '5days' ? 'selected' : ''; ?>>Last 5 Days</option>
-                        <option value="6days" <?php echo $date_filter === '6days' ? 'selected' : ''; ?>>Last 6 Days</option>
-                        <option value="week" <?php echo $date_filter === 'week' ? 'selected' : ''; ?>>This Week</option>
-                        <option value="month" <?php echo $date_filter === 'month' ? 'selected' : ''; ?>>This Month</option>
-                        <option value="quarter" <?php echo $date_filter === 'quarter' ? 'selected' : ''; ?>>This Quarter</option>
-                        <option value="year" <?php echo $date_filter === 'year' ? 'selected' : ''; ?>>This Year</option>
+                        <optgroup label="Current Period">
+                            <option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option>
+                            <option value="yesterday" <?php echo $date_filter === 'yesterday' ? 'selected' : ''; ?>>Yesterday</option>
+                            <option value="2days" <?php echo $date_filter === '2days' ? 'selected' : ''; ?>>Last 2 Days</option>
+                            <option value="3days" <?php echo $date_filter === '3days' ? 'selected' : ''; ?>>Last 3 Days</option>
+                            <option value="4days" <?php echo $date_filter === '4days' ? 'selected' : ''; ?>>Last 4 Days</option>
+                            <option value="5days" <?php echo $date_filter === '5days' ? 'selected' : ''; ?>>Last 5 Days</option>
+                            <option value="6days" <?php echo $date_filter === '6days' ? 'selected' : ''; ?>>Last 6 Days</option>
+                            <option value="week" <?php echo $date_filter === 'week' ? 'selected' : ''; ?>>This Week</option>
+                            <option value="month" <?php echo $date_filter === 'month' ? 'selected' : ''; ?>>This Month</option>
+                            <option value="quarter" <?php echo $date_filter === 'quarter' ? 'selected' : ''; ?>>This Quarter</option>
+                            <option value="year" <?php echo $date_filter === 'year' ? 'selected' : ''; ?>>This Year</option>
+                        </optgroup>
+                        <optgroup label="Previous Periods">
+                            <option value="last_week" <?php echo $date_filter === 'last_week' ? 'selected' : ''; ?>>Last Week</option>
+                            <option value="last_2weeks" <?php echo $date_filter === 'last_2weeks' ? 'selected' : ''; ?>>Last 2 Weeks</option>
+                            <option value="last_month" <?php echo $date_filter === 'last_month' ? 'selected' : ''; ?>>Last Month</option>
+                            <option value="last_2months" <?php echo $date_filter === 'last_2months' ? 'selected' : ''; ?>>Last 2 Months</option>
+                            <option value="last_3months" <?php echo $date_filter === 'last_3months' ? 'selected' : ''; ?>>Last 3 Months</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="col-lg-4 col-md-12">
@@ -374,10 +476,69 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
             <div class="card stat-card border-0 shadow-sm h-100">
                 <div class="card-body text-center p-3">
                     <div class="stat-icon mb-2">
-                        <i class="fas fa-calendar-alt fa-2x text-info"></i>
+                        <i class="fas fa-calendar-week fa-2x text-info"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $last_week_total; ?></h4>
+                    <p class="text-muted small mb-0">Last Week</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-week fa-2x text-warning"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $last_2weeks_total; ?></h4>
+                    <p class="text-muted small mb-0">Last 2 Weeks</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-alt fa-2x text-danger"></i>
                     </div>
                     <h4 class="fw-bold text-dark mb-1"><?php echo $monthly_total; ?></h4>
                     <p class="text-muted small mb-0">This Month</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-alt fa-2x text-primary"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $last_month_total; ?></h4>
+                    <p class="text-muted small mb-0">Last Month</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extended Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-alt fa-2x text-success"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $last_2months_total; ?></h4>
+                    <p class="text-muted small mb-0">Last 2 Months</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-calendar-alt fa-2x text-info"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $last_3months_total; ?></h4>
+                    <p class="text-muted small mb-0">Last 3 Months</p>
                 </div>
             </div>
         </div>
@@ -412,7 +573,18 @@ $country_breakdown = db_fetch_all($country_breakdown_sql, $country_breakdown_par
                     <h4 class="fw-bold <?php echo $growth_percentage >= 0 ? 'text-success' : 'text-danger'; ?> mb-1">
                         <?php echo number_format($growth_percentage, 1); ?>%
                     </h4>
-                    <p class="text-muted small mb-0">Monthly Growth</p>
+                    <p class="text-muted small mb-0">Growth vs Previous</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
+            <div class="card stat-card border-0 shadow-sm h-100">
+                <div class="card-body text-center p-3">
+                    <div class="stat-icon mb-2">
+                        <i class="fas fa-chart-bar fa-2x text-primary"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1"><?php echo $current_total; ?></h4>
+                    <p class="text-muted small mb-0">Selected Period</p>
                 </div>
             </div>
         </div>
@@ -836,6 +1008,12 @@ document.addEventListener('DOMContentLoaded', function() {
 .stat-card:nth-child(10) { border-left-color: #ffc107; }
 .stat-card:nth-child(11) { border-left-color: #dc3545; }
 .stat-card:nth-child(12) { border-left-color: #6f42c1; }
+.stat-card:nth-child(13) { border-left-color: #20c997; }
+.stat-card:nth-child(14) { border-left-color: #0dcaf0; }
+.stat-card:nth-child(15) { border-left-color: #ffc107; }
+.stat-card:nth-child(16) { border-left-color: #dc3545; }
+.stat-card:nth-child(17) { border-left-color: #6f42c1; }
+.stat-card:nth-child(18) { border-left-color: #0d6efd; }
 
 .stat-icon {
     opacity: 0.8;
