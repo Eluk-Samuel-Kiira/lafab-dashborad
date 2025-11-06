@@ -6,56 +6,69 @@ require_once '../includes/sidebar.php';
 // Get filter parameters
 $platform_filter = $_GET['platform'] ?? '';
 $country_filter = $_GET['country'] ?? '';
-$date_range = $_GET['date_range'] ?? 'last_30_days';
+$date_range = $_GET['date_range'] ?? 'last_month';
 
-// Calculate date ranges
+// Calculate date ranges for current and previous periods
 $end_date = date('Y-m-d');
 switch ($date_range) {
-    case 'last_7_days':
-        $start_date = date('Y-m-d', strtotime('-7 days'));
-        $period_label = 'Last 7 Days';
+    case 'today':
+        $start_date = date('Y-m-d');
+        $previous_start_date = date('Y-m-d', strtotime('-1 day'));
+        $previous_end_date = date('Y-m-d', strtotime('-1 day'));
+        $period_label = 'Today';
         $trend_interval = 'daily';
         break;
-    case 'last_30_days':
-        $start_date = date('Y-m-d', strtotime('-30 days'));
-        $period_label = 'Last 30 Days';
+    case 'this_week':
+        $start_date = date('Y-m-d', strtotime('monday this week'));
+        $previous_start_date = date('Y-m-d', strtotime('monday last week'));
+        $previous_end_date = date('Y-m-d', strtotime('sunday last week'));
+        $period_label = 'This Week';
         $trend_interval = 'daily';
+        break;
+    case 'last_week':
+        $start_date = date('Y-m-d', strtotime('monday last week'));
+        $end_date = date('Y-m-d', strtotime('sunday last week'));
+        $previous_start_date = date('Y-m-d', strtotime('monday -2 weeks'));
+        $previous_end_date = date('Y-m-d', strtotime('sunday -2 weeks'));
+        $period_label = 'Last Week';
+        $trend_interval = 'daily';
+        break;
+    case 'this_month':
+        $start_date = date('Y-m-01');
+        $previous_start_date = date('Y-m-01', strtotime('-1 month'));
+        $previous_end_date = date('Y-m-t', strtotime('-1 month'));
+        $period_label = 'This Month';
+        $trend_interval = 'weekly';
         break;
     case 'last_month':
         $start_date = date('Y-m-01', strtotime('-1 month'));
         $end_date = date('Y-m-t', strtotime('-1 month'));
-        $period_label = 'Last Calendar Month';
+        $previous_start_date = date('Y-m-01', strtotime('-2 months'));
+        $previous_end_date = date('Y-m-t', strtotime('-2 months'));
+        $period_label = 'Last Month';
         $trend_interval = 'weekly';
         break;
     case 'last_3_months':
         $start_date = date('Y-m-d', strtotime('-3 months'));
+        $previous_start_date = date('Y-m-d', strtotime('-6 months'));
+        $previous_end_date = date('Y-m-d', strtotime('-3 months -1 day'));
         $period_label = 'Last 3 Months';
-        $trend_interval = 'weekly';
+        $trend_interval = 'monthly';
         break;
     case 'last_6_months':
         $start_date = date('Y-m-d', strtotime('-6 months'));
+        $previous_start_date = date('Y-m-d', strtotime('-12 months'));
+        $previous_end_date = date('Y-m-d', strtotime('-6 months -1 day'));
         $period_label = 'Last 6 Months';
         $trend_interval = 'monthly';
         break;
-    case 'last_year':
-        $start_date = date('Y-m-d', strtotime('-1 year'));
-        $period_label = 'Last Year';
-        $trend_interval = 'monthly';
-        break;
-    case 'last_2_years':
-        $start_date = date('Y-m-d', strtotime('-2 years'));
-        $period_label = 'Last 2 Years';
-        $trend_interval = 'quarterly';
-        break;
-    case 'last_5_years':
-        $start_date = date('Y-m-d', strtotime('-5 years'));
-        $period_label = 'Last 5 Years';
-        $trend_interval = 'yearly';
-        break;
     default:
-        $start_date = date('Y-m-d', strtotime('-30 days'));
-        $period_label = 'Last 30 Days';
-        $trend_interval = 'daily';
+        $start_date = date('Y-m-01', strtotime('-1 month'));
+        $end_date = date('Y-m-t', strtotime('-1 month'));
+        $previous_start_date = date('Y-m-01', strtotime('-2 months'));
+        $previous_end_date = date('Y-m-t', strtotime('-2 months'));
+        $period_label = 'Last Month';
+        $trend_interval = 'weekly';
         break;
 }
 
@@ -75,205 +88,132 @@ if ($country_filter) {
 
 $where_clause = implode(" AND ", $where_conditions);
 
-// Get platforms for filter
+// Get platforms and countries for filters
 $platforms = db_fetch_all("SELECT name FROM social_media_platforms ORDER BY name");
-$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia'];
+$countries = db_fetch_all("SELECT DISTINCT country FROM social_media_daily_stats WHERE country IS NOT NULL ORDER BY country");
 
-// Calculate comprehensive growth metrics - Only include dates with actual data
-$current_period_stats = db_fetch_one("
-    SELECT 
-        SUM(followers) as total_followers,
-        SUM(engagements) as total_engagements,
-        SUM(likes) as total_likes,
-        SUM(shares) as total_shares,
-        SUM(comments) as total_comments,
-        SUM(impressions) as total_impressions,
-        SUM(reach) as total_reach,
-        SUM(video_views) as total_video_views,
-        COUNT(DISTINCT platform_id) as platform_count,
-        COUNT(DISTINCT country) as country_count,
-        COUNT(*) as total_entries
-    FROM social_media_daily_stats sms
-    JOIN social_media_platforms p ON sms.platform_id = p.id
-    WHERE $where_clause
-    AND sms.followers > 0  -- Only include entries with actual follower data
-", $params);
+// NEW: Get the last captured followers from previous period and current period
+$growth_data = [];
 
-// Previous period for comparison - Only include dates with actual data
-$previous_start_date = date('Y-m-d', strtotime($start_date . ' -1 ' . str_replace('last_', '', $date_range)));
-$previous_end_date = date('Y-m-d', strtotime($end_date . ' -1 ' . str_replace('last_', '', $date_range)));
-
-// Build WHERE clause for previous period with same filters
-$prev_where_conditions = ["stat_date BETWEEN ? AND ?"];
-$prev_params = [$previous_start_date, $previous_end_date];
-
-if ($platform_filter) {
-    $prev_where_conditions[] = "p.name = ?";
-    $prev_params[] = $platform_filter;
-}
-
-if ($country_filter) {
-    $prev_where_conditions[] = "sms.country = ?";
-    $prev_params[] = $country_filter;
-}
-
-$prev_where_clause = implode(" AND ", $prev_where_conditions);
-
-$previous_period_stats = db_fetch_one("
-    SELECT 
-        SUM(followers) as total_followers,
-        SUM(engagements) as total_engagements,
-        SUM(likes) as total_likes,
-        SUM(shares) as total_shares,
-        SUM(comments) as total_comments
-    FROM social_media_daily_stats sms
-    JOIN social_media_platforms p ON sms.platform_id = p.id
-    WHERE $prev_where_clause
-    AND sms.followers > 0  -- Only include entries with actual follower data
-", $prev_params);
-
-// NEW: Get platform-specific growth data
-$platform_growth_data = [];
 foreach ($platforms as $platform) {
     $platform_name = $platform['name'];
     
-    // Current period stats for this platform
-    $platform_current_where = ["stat_date BETWEEN ? AND ?", "p.name = ?", "sms.followers > 0"];
-    $platform_current_params = [$start_date, $end_date, $platform_name];
+    // Build platform-specific conditions
+    $platform_conditions = ["stat_date BETWEEN ? AND ?", "p.name = ?"];
+    $platform_params = [$start_date, $end_date, $platform_name];
+    
+    $prev_platform_conditions = ["stat_date BETWEEN ? AND ?", "p.name = ?"];
+    $prev_platform_params = [$previous_start_date, $previous_end_date, $platform_name];
     
     if ($country_filter) {
-        $platform_current_where[] = "sms.country = ?";
-        $platform_current_params[] = $country_filter;
+        $platform_conditions[] = "sms.country = ?";
+        $platform_params[] = $country_filter;
+        $prev_platform_conditions[] = "sms.country = ?";
+        $prev_platform_params[] = $country_filter;
     }
     
-    $platform_current_where_clause = implode(" AND ", $platform_current_where);
+    $platform_where = implode(" AND ", $platform_conditions);
+    $prev_platform_where = implode(" AND ", $prev_platform_conditions);
     
-    $platform_current_stats = db_fetch_one("
-        SELECT 
-            SUM(followers) as total_followers,
-            SUM(engagements) as total_engagements
+    // Get last captured followers from previous period
+    $previous_followers_data = db_fetch_one("
+        SELECT sms.followers, sms.stat_date
         FROM social_media_daily_stats sms
         JOIN social_media_platforms p ON sms.platform_id = p.id
-        WHERE $platform_current_where_clause
-    ", $platform_current_params);
+        WHERE $prev_platform_where
+        ORDER BY sms.stat_date DESC
+        LIMIT 1
+    ", $prev_platform_params);
     
-    // Previous period stats for this platform
-    $platform_prev_where = ["stat_date BETWEEN ? AND ?", "p.name = ?", "sms.followers > 0"];
-    $platform_prev_params = [$previous_start_date, $previous_end_date, $platform_name];
+    // Get latest captured followers from current period
+    $current_followers_data = db_fetch_one("
+        SELECT sms.followers, sms.stat_date
+        FROM social_media_daily_stats sms
+        JOIN social_media_platforms p ON sms.platform_id = p.id
+        WHERE $platform_where
+        ORDER BY sms.stat_date DESC
+        LIMIT 1
+    ", $platform_params);
     
-    if ($country_filter) {
-        $platform_prev_where[] = "sms.country = ?";
-        $platform_prev_params[] = $country_filter;
+    $previous_followers = $previous_followers_data ? $previous_followers_data['followers'] : 0;
+    $current_followers = $current_followers_data ? $current_followers_data['followers'] : 0;
+    
+    // Calculate percentage growth
+    $percentage_growth = 0;
+    if ($previous_followers > 0) {
+        $percentage_growth = (($current_followers - $previous_followers) / $previous_followers) * 100;
+    } elseif ($current_followers > 0) {
+        $percentage_growth = 100; // New platform with growth
     }
     
-    $platform_prev_where_clause = implode(" AND ", $platform_prev_where);
-    
-    $platform_prev_stats = db_fetch_one("
-        SELECT 
-            SUM(followers) as total_followers,
-            SUM(engagements) as total_engagements
-        FROM social_media_daily_stats sms
-        JOIN social_media_platforms p ON sms.platform_id = p.id
-        WHERE $platform_prev_where_clause
-    ", $platform_prev_params);
-    
-    // Calculate growth percentages
-    $platform_follower_growth = calculateGrowth($platform_current_stats['total_followers'], $platform_prev_stats['total_followers']);
-    $platform_engagement_growth = calculateGrowth($platform_current_stats['total_engagements'], $platform_prev_stats['total_engagements']);
-    
-    // Overall platform growth (weighted average)
-    $platform_overall_growth = ($platform_follower_growth * 0.4) + ($platform_engagement_growth * 0.6);
-    
-    $platform_growth_data[$platform_name] = [
-        'follower_growth' => $platform_follower_growth,
-        'engagement_growth' => $platform_engagement_growth,
-        'overall_growth' => $platform_overall_growth,
-        'current_followers' => $platform_current_stats['total_followers'],
-        'current_engagements' => $platform_current_stats['total_engagements']
+    $growth_data[$platform_name] = [
+        'previous_followers' => $previous_followers,
+        'current_followers' => $current_followers,
+        'growth' => $percentage_growth,
+        'follower_change' => $current_followers - $previous_followers,
+        'has_data' => ($previous_followers > 0 || $current_followers > 0)
     ];
 }
 
-// Calculate growth percentages with error handling
-function calculateGrowth($current, $previous) {
-    if ($previous > 0) {
-        return (($current - $previous) / $previous) * 100;
-    }
-    return $current > 0 ? 100 : 0;
-}
+// Calculate average growth across all platforms
+$total_growth = 0;
+$platforms_with_data = 0;
 
-$follower_growth = calculateGrowth($current_period_stats['total_followers'], $previous_period_stats['total_followers']);
-$engagement_growth = calculateGrowth($current_period_stats['total_engagements'], $previous_period_stats['total_engagements']);
-$like_growth = calculateGrowth($current_period_stats['total_likes'], $previous_period_stats['total_likes']);
-$share_growth = calculateGrowth($current_period_stats['total_shares'], $previous_period_stats['total_shares']);
-$comment_growth = calculateGrowth($current_period_stats['total_comments'], $previous_period_stats['total_comments']);
-
-// NEW: Calculate overall growth as average of platform growth percentages
-$total_platform_growth = 0;
-$active_platform_count = 0;
-
-foreach ($platform_growth_data as $platform_data) {
-    if ($platform_data['current_followers'] > 0) { // Only count platforms with actual data
-        $total_platform_growth += $platform_data['overall_growth'];
-        $active_platform_count++;
+foreach ($growth_data as $platform_data) {
+    if ($platform_data['has_data']) {
+        $total_growth += $platform_data['growth'];
+        $platforms_with_data++;
     }
 }
 
-$overall_growth = $active_platform_count > 0 ? ($total_platform_growth / $active_platform_count) : 0;
+$average_growth = $platforms_with_data > 0 ? $total_growth / $platforms_with_data : 0;
 
-// Platform performance by country - Only include entries with actual data
+// Get additional metrics for the current period
+$current_metrics = db_fetch_one("
+    SELECT 
+        SUM(sms.followers) as total_followers,
+        SUM(sms.engagements) as total_engagements,
+        SUM(sms.likes) as total_likes,
+        SUM(sms.shares) as total_shares,
+        SUM(sms.comments) as total_comments,
+        COUNT(DISTINCT p.id) as platform_count,
+        COUNT(DISTINCT sms.country) as country_count
+    FROM social_media_daily_stats sms
+    JOIN social_media_platforms p ON sms.platform_id = p.id
+    WHERE $where_clause
+", $params);
+
+// Get platform-country performance data
 $platform_country_stats = db_fetch_all("
     SELECT 
         p.name as platform,
         sms.country,
         MAX(sms.followers) as current_followers,
         MAX(sms.engagements) as current_engagements,
-        AVG(sms.engagements) as avg_engagements,
-        AVG(CASE WHEN sms.followers > 0 THEN (sms.engagements / sms.followers * 100) ELSE 0 END) as avg_engagement_rate,
-        COUNT(sms.id) as days_tracked,
-        SUM(sms.likes) as total_likes,
-        SUM(sms.shares) as total_shares,
-        SUM(sms.comments) as total_comments
+        AVG(CASE WHEN sms.followers > 0 THEN (sms.engagements / sms.followers * 100) ELSE 0 END) as engagement_rate
     FROM social_media_daily_stats sms
     JOIN social_media_platforms p ON sms.platform_id = p.id
     WHERE $where_clause
-    AND sms.followers > 0  -- Only include entries with actual follower data
     GROUP BY p.name, sms.country
-    ORDER BY p.name, sms.country, current_followers DESC
+    ORDER BY p.name, sms.country
 ", $params);
 
-// Country performance - Only include entries with actual data
+// Get country performance summary
 $country_stats = db_fetch_all("
     SELECT 
         country,
         SUM(followers) as total_followers,
         SUM(engagements) as total_engagements,
-        COUNT(DISTINCT platform_id) as platforms_count,
-        AVG(CASE WHEN followers > 0 THEN (engagements / followers * 100) ELSE 0 END) as avg_engagement_rate
+        COUNT(DISTINCT platform_id) as platforms_count
     FROM social_media_daily_stats sms
     JOIN social_media_platforms p ON sms.platform_id = p.id
     WHERE $where_clause
-    AND sms.followers > 0  -- Only include entries with actual follower data
     GROUP BY country
     ORDER BY total_followers DESC
 ", $params);
 
-// Content performance
-$content_stats = db_fetch_all("
-    SELECT 
-        content_type,
-        COUNT(*) as post_count,
-        AVG(engagements) as avg_engagement,
-        SUM(engagements) as total_engagement,
-        AVG(CASE WHEN engagements > 0 THEN 1 ELSE 0 END) * 100 as success_rate
-    FROM social_media_posts
-    WHERE post_date BETWEEN ? AND ?
-    AND engagements > 0  -- Only include posts with actual engagement
-    GROUP BY content_type
-    ORDER BY avg_engagement DESC
-", [$start_date, $end_date]);
-
-// DYNAMIC GROWTH TRENDS - Get only dates with actual data
-$trends_where_conditions = ["stat_date BETWEEN ? AND ?", "sms.followers > 0"];
+// Get growth trends data for charts
+$trends_where_conditions = ["stat_date BETWEEN ? AND ?"];
 $trends_params = [$start_date, $end_date];
 
 if ($platform_filter) {
@@ -293,68 +233,42 @@ switch ($trend_interval) {
     case 'daily':
         $date_format = '%Y-%m-%d';
         $group_by = "stat_date";
-        $order_format = 'Y-m-d';
         break;
     case 'weekly':
         $date_format = '%Y-%W';
         $group_by = "strftime('%Y-%W', stat_date)";
-        $order_format = 'Y-W';
         break;
     case 'monthly':
         $date_format = '%Y-%m';
         $group_by = "strftime('%Y-%m', stat_date)";
-        $order_format = 'Y-m';
-        break;
-    case 'quarterly':
-        $date_format = '%Y-Q';
-        $group_by = "strftime('%Y', stat_date) || '-Q' || ((strftime('%m', stat_date) + 2) / 3)";
-        $order_format = 'Y-Q';
-        break;
-    case 'yearly':
-        $date_format = '%Y';
-        $group_by = "strftime('%Y', stat_date)";
-        $order_format = 'Y';
         break;
 }
 
-// FIXED: Platform Growth Trends - Group by platform only (not by country)
-$platform_trends = db_fetch_all("
+// Platform Growth Trends by Country
+$platform_country_trends = db_fetch_all("
     SELECT 
         $group_by as period,
         p.name as platform,
-        SUM(sms.followers) as period_followers,  -- SUM across all countries
-        SUM(sms.engagements) as period_engagements
-    FROM social_media_daily_stats sms
-    JOIN social_media_platforms p ON sms.platform_id = p.id
-    WHERE $trends_where_clause
-    GROUP BY $group_by, p.name
-    ORDER BY period ASC, p.name
-", $trends_params);
-
-// FIXED: Country Growth Trends - Group by country only (not by platform)
-$country_trends = db_fetch_all("
-    SELECT 
-        $group_by as period,
         sms.country,
-        MAX(sms.followers) as period_followers,  -- Use MAX instead of SUM to get latest available value
+        MAX(sms.followers) as period_followers,
         SUM(sms.engagements) as period_engagements
     FROM social_media_daily_stats sms
     JOIN social_media_platforms p ON sms.platform_id = p.id
     WHERE $trends_where_clause
-    GROUP BY $group_by, sms.country
-    ORDER BY period ASC, sms.country
+    GROUP BY $group_by, p.name, sms.country
+    ORDER BY period ASC, p.name, sms.country
 ", $trends_params);
 
 // Prepare data for charts
 $platform_colors = [
-    'Facebook' => '#1877F2',      // Keep Facebook blue
-    'LinkedIn' => '#FF6B35',      // Changed to orange
-    'Twitter' => '#1DA1F2',       // Keep Twitter blue
-    'Telegram' => '#0088CC',      // Keep Telegram blue
-    'TikTok' => '#000000',        // Keep TikTok black
-    'WhatsApp' => '#25D366',      // Keep WhatsApp green
-    'Instagram' => '#E4405F',     // Keep Instagram pink
-    'YouTube' => '#FF0000'        // Keep YouTube red
+    'Facebook' => '#1877F2',
+    'LinkedIn' => '#0A66C2',
+    'Twitter' => '#1DA1F2',
+    'Telegram' => '#0088CC',
+    'TikTok' => '#000000',
+    'WhatsApp' => '#25D366',
+    'Instagram' => '#E4405F',
+    'YouTube' => '#FF0000'
 ];
 
 $country_colors = [
@@ -366,7 +280,7 @@ $country_colors = [
     'Other' => '#BDC3C7'
 ];
 
-// Prepare platform-country matrix for chart
+// Prepare platform-country matrix
 $platform_country_matrix = [];
 foreach ($platform_country_stats as $stat) {
     $platform = $stat['platform'];
@@ -377,59 +291,31 @@ foreach ($platform_country_stats as $stat) {
     $platform_country_matrix[$platform][$country] = $stat;
 }
 
-// Prepare dynamic trends data - ONLY include periods with actual data
-$period_platform_data = [];
-$period_country_data = [];
+// Prepare trends data
+$period_platform_country_data = [];
 $all_periods = [];
 
-// First, collect all unique periods that have actual data from BOTH queries
-foreach ($platform_trends as $trend) {
+foreach ($platform_country_trends as $trend) {
     $period = $trend['period'];
+    $platform = $trend['platform'];
+    $country = $trend['country'];
+    
     if (!in_array($period, $all_periods)) {
         $all_periods[] = $period;
     }
-}
-foreach ($country_trends as $trend) {
-    $period = $trend['period'];
-    if (!in_array($period, $all_periods)) {
-        $all_periods[] = $period;
+    
+    if (!isset($period_platform_country_data[$platform])) {
+        $period_platform_country_data[$platform] = [];
     }
+    if (!isset($period_platform_country_data[$platform][$country])) {
+        $period_platform_country_data[$platform][$country] = [];
+    }
+    
+    $period_platform_country_data[$platform][$country][$period] = $trend['period_followers'];
 }
 
 // Sort periods chronologically
-usort($all_periods, function($a, $b) use ($trend_interval) {
-    if ($trend_interval === 'quarterly') {
-        // Convert Q1-2024, Q2-2024 format for sorting
-        $a_parts = explode('-Q', $a);
-        $b_parts = explode('-Q', $b);
-        return ($a_parts[0] * 4 + $a_parts[1]) <=> ($b_parts[0] * 4 + $b_parts[1]);
-    }
-    return $a <=> $b;
-});
-
-// Now populate PLATFORM data - ONLY include periods with actual data (no filling gaps)
-foreach ($platform_trends as $trend) {
-    $period = $trend['period'];
-    $platform = $trend['platform'];
-    
-    // Platform trends - only add if we have data for this period
-    if (!isset($period_platform_data[$platform])) {
-        $period_platform_data[$platform] = [];
-    }
-    $period_platform_data[$platform][$period] = $trend['period_followers'];
-}
-
-// Now populate COUNTRY data - ONLY include periods with actual data (no filling gaps)
-foreach ($country_trends as $trend) {
-    $period = $trend['period'];
-    $country = $trend['country'];
-    
-    // Country trends - only add if we have data for this period
-    if (!isset($period_country_data[$country])) {
-        $period_country_data[$country] = [];
-    }
-    $period_country_data[$country][$period] = $trend['period_followers'];
-}
+sort($all_periods);
 
 // Format period labels based on interval
 $formatted_periods = [];
@@ -445,52 +331,13 @@ foreach ($all_periods as $period) {
         case 'monthly':
             $formatted_periods[] = date('M Y', strtotime($period . '-01'));
             break;
-        case 'quarterly':
-            $parts = explode('-Q', $period);
-            $formatted_periods[] = 'Q' . $parts[1] . ' ' . $parts[0];
-            break;
-        case 'yearly':
-            $formatted_periods[] = $period;
-            break;
     }
-}
-
-// Prepare platform growth data for chart - only include platforms with data
-$platform_growth_chart_data = [];
-foreach ($platforms as $platform) {
-    $platform_name = $platform['name'];
-    if (isset($period_platform_data[$platform_name]) && !empty($period_platform_data[$platform_name])) {
-        $platform_growth_chart_data[$platform_name] = $period_platform_data[$platform_name];
-    }
-}
-
-// Prepare country growth data for chart - only include countries with data
-$country_growth_chart_data = [];
-foreach ($countries as $country) {
-    if (isset($period_country_data[$country]) && !empty($period_country_data[$country])) {
-        $country_growth_chart_data[$country] = $period_country_data[$country];
-    }
-}
-
-// Generate unique colors for countries
-$unique_country_colors = [];
-$available_colors = [
-    '#FF6B6B', '#4ECDC4', '#d14592ff', '#96CEB4', '#FFEAA7', 
-    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-    '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
-    '#F9E79F', '#ABEBC6', '#AED6F1', '#FAD7A0', '#236b5dff'
-];
-
-$color_index = 0;
-foreach (array_keys($country_growth_chart_data) as $country) {
-    $unique_country_colors[$country] = $available_colors[$color_index % count($available_colors)];
-    $color_index++;
 }
 ?>
 
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Social Media Performance Analytics</h1>
+        <h1 class="h2">Social Media Growth Analytics</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
             <span class="text-muted"><?php echo date('F j, Y'); ?></span>
         </div>
@@ -519,8 +366,8 @@ foreach (array_keys($country_growth_chart_data) as $country) {
                     <select name="country" class="form-select">
                         <option value="">All Countries</option>
                         <?php foreach ($countries as $country): ?>
-                            <option value="<?php echo $country; ?>" <?php echo $country_filter === $country ? 'selected' : ''; ?>>
-                                <?php echo $country; ?>
+                            <option value="<?php echo $country['country']; ?>" <?php echo $country_filter === $country['country'] ? 'selected' : ''; ?>>
+                                <?php echo $country['country']; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -528,14 +375,13 @@ foreach (array_keys($country_growth_chart_data) as $country) {
                 <div class="col-md-3">
                     <label class="form-label">Date Range</label>
                     <select name="date_range" class="form-select">
-                        <option value="last_7_days" <?php echo $date_range === 'last_7_days' ? 'selected' : ''; ?>>Last 7 Days</option>
-                        <option value="last_30_days" <?php echo $date_range === 'last_30_days' ? 'selected' : ''; ?>>Last 30 Days</option>
-                        <option value="last_month" <?php echo $date_range === 'last_month' ? 'selected' : ''; ?>>Last Calendar Month</option>
+                        <option value="today" <?php echo $date_range === 'today' ? 'selected' : ''; ?>>Today</option>
+                        <option value="this_week" <?php echo $date_range === 'this_week' ? 'selected' : ''; ?>>This Week</option>
+                        <option value="last_week" <?php echo $date_range === 'last_week' ? 'selected' : ''; ?>>Last Week</option>
+                        <option value="this_month" <?php echo $date_range === 'this_month' ? 'selected' : ''; ?>>This Month</option>
+                        <option value="last_month" <?php echo $date_range === 'last_month' ? 'selected' : ''; ?>>Last Month</option>
                         <option value="last_3_months" <?php echo $date_range === 'last_3_months' ? 'selected' : ''; ?>>Last 3 Months</option>
                         <option value="last_6_months" <?php echo $date_range === 'last_6_months' ? 'selected' : ''; ?>>Last 6 Months</option>
-                        <option value="last_year" <?php echo $date_range === 'last_year' ? 'selected' : ''; ?>>Last Year</option>
-                        <option value="last_2_years" <?php echo $date_range === 'last_2_years' ? 'selected' : ''; ?>>Last 2 Years</option>
-                        <option value="last_5_years" <?php echo $date_range === 'last_5_years' ? 'selected' : ''; ?>>Last 5 Years</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -548,51 +394,135 @@ foreach (array_keys($country_growth_chart_data) as $country) {
         </div>
     </div>
 
-    <!-- NEW: Platform Growth Overview Cards -->
+    <!-- Growth Overview Cards -->
     <div class="row mb-4">
-        <!-- Overall Growth Summary Card -->
+        <!-- Average Growth Card -->
         <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
-            <div class="card stat-card h-100 bg-warning text-white">
+            <div class="card stat-card h-100 bg-primary text-white">
                 <div class="card-body text-center">
-                    <h6 class="card-title text-white-50">Overall Platform Growth</h6>
-                    <h3 class="<?php echo $overall_growth >= 10 ? 'text-success' : ($overall_growth >= 0 ? 'text-warning' : 'text-danger'); ?>">
-                        <?php echo number_format($overall_growth, 1); ?>%
-                    </h3>
-                    <small class="text-white-50">Average of <?php echo $active_platform_count; ?> Platforms</small>
+                    <h6 class="card-title text-white-50">Average Growth</h6>
+                    <h2 class="<?php echo $average_growth >= 0 ? 'text-success' : 'text-danger'; ?>">
+                        <?php echo number_format($average_growth, 1); ?>%
+                    </h2>
+                    <small class="text-white-50">Across <?php echo $platforms_with_data; ?> Platforms</small>
                     <div class="mt-2">
-                        <span class="badge bg-<?php echo $overall_growth >= 10 ? 'success' : ($overall_growth >= 0 ? 'warning' : 'danger'); ?>">
-                            <?php echo $overall_growth >= 10 ? 'Excellent' : ($overall_growth >= 0 ? 'Stable' : 'Declining'); ?>
+                        <span class="badge bg-<?php echo $average_growth >= 10 ? 'success' : ($average_growth >= 0 ? 'warning' : 'danger'); ?>">
+                            <?php echo $average_growth >= 10 ? 'Strong Growth' : ($average_growth >= 0 ? 'Stable' : 'Declining'); ?>
                         </span>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Platform-specific Growth Cards -->
-        <?php foreach ($platform_growth_data as $platform_name => $platform_data): ?>
-            <?php if ($platform_data['current_followers'] > 0): ?>
-                <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
+        <!-- Total Followers Card -->
+        <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+            <div class="card stat-card h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Total Followers</h6>
+                    <h2 class="text-info"><?php echo number_format($current_metrics['total_followers']); ?></h2>
+                    <small class="text-muted">Current Period</small>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <?php echo $current_metrics['platform_count']; ?> platforms, 
+                            <?php echo $current_metrics['country_count']; ?> countries
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Platform Performance Summary -->
+        <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+            <div class="card stat-card h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Platform Performance</h6>
+                    <div class="d-flex justify-content-around mt-3">
+                        <div>
+                            <div class="text-success">
+                                <strong><?php echo count(array_filter($growth_data, fn($data) => $data['growth'] > 0 && $data['has_data'])); ?></strong>
+                            </div>
+                            <small class="text-muted">Growing</small>
+                        </div>
+                        <div>
+                            <div class="text-warning">
+                                <strong><?php echo count(array_filter($growth_data, fn($data) => $data['growth'] == 0 && $data['has_data'])); ?></strong>
+                            </div>
+                            <small class="text-muted">Stable</small>
+                        </div>
+                        <div>
+                            <div class="text-danger">
+                                <strong><?php echo count(array_filter($growth_data, fn($data) => $data['growth'] < 0 && $data['has_data'])); ?></strong>
+                            </div>
+                            <small class="text-muted">Declining</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Engagement Overview -->
+        <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+            <div class="card stat-card h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Total Engagement</h6>
+                    <h2 class="text-success"><?php echo number_format($current_metrics['total_engagements']); ?></h2>
+                    <small class="text-muted">Current Period</small>
+                    <div class="mt-2">
+                        <div class="row small text-muted">
+                            <div class="col-4">
+                                <div>Likes</div>
+                                <strong><?php echo number_format($current_metrics['total_likes']); ?></strong>
+                            </div>
+                            <div class="col-4">
+                                <div>Shares</div>
+                                <strong><?php echo number_format($current_metrics['total_shares']); ?></strong>
+                            </div>
+                            <div class="col-4">
+                                <div>Comments</div>
+                                <strong><?php echo number_format($current_metrics['total_comments']); ?></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Platform Growth Cards -->
+    <div class="row mb-4">
+        <?php foreach ($growth_data as $platform_name => $data): ?>
+            <?php if ($data['has_data']): ?>
+                <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
                     <div class="card stat-card h-100">
-                        <div class="card-body text-center">
-                            <h6 class="card-title"><?php echo $platform_name; ?></h6>
-                            <h3 class="<?php echo $platform_data['overall_growth'] >= 10 ? 'text-success' : ($platform_data['overall_growth'] >= 0 ? 'text-warning' : 'text-danger'); ?>">
-                                <?php echo number_format($platform_data['overall_growth'], 1); ?>%
-                            </h3>
-                            <small class="text-muted">Overall Growth</small>
-                            <div class="mt-2">
-                                <div class="row small text-muted">
-                                    <div class="col-6">
-                                        <div>Followers</div>
-                                        <strong class="<?php echo $platform_data['follower_growth'] >= 0 ? 'text-success' : 'text-danger'; ?>">
-                                            <?php echo number_format($platform_data['follower_growth'], 1); ?>%
-                                        </strong>
-                                    </div>
-                                    <div class="col-6">
-                                        <div>Engagement</div>
-                                        <strong class="<?php echo $platform_data['engagement_growth'] >= 0 ? 'text-success' : 'text-danger'; ?>">
-                                            <?php echo number_format($platform_data['engagement_growth'], 1); ?>%
-                                        </strong>
-                                    </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0"><?php echo $platform_name; ?></h6>
+                                <span class="badge bg-<?php echo $data['growth'] >= 10 ? 'success' : ($data['growth'] >= 0 ? 'warning' : 'danger'); ?>">
+                                    <?php echo number_format($data['growth'], 1); ?>%
+                                </span>
+                            </div>
+                            
+                            <div class="row text-center mt-3">
+                                <div class="col-6">
+                                    <small class="text-muted">Previous</small>
+                                    <div class="fw-bold"><?php echo number_format($data['previous_followers']); ?></div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Current</small>
+                                    <div class="fw-bold text-primary"><?php echo number_format($data['current_followers']); ?></div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 text-center">
+                                <small class="text-muted">Net Change</small>
+                                <div class="fw-bold <?php echo $data['follower_change'] >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                    <?php echo ($data['follower_change'] >= 0 ? '+' : '') . number_format($data['follower_change']); ?>
+                                </div>
+                            </div>
+                            
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-<?php echo $data['growth'] >= 0 ? 'success' : 'danger'; ?>" 
+                                     style="width: <?php echo min(abs($data['growth']), 100); ?>%">
                                 </div>
                             </div>
                         </div>
@@ -602,86 +532,7 @@ foreach (array_keys($country_growth_chart_data) as $country) {
         <?php endforeach; ?>
     </div>
 
-    <!-- Original Growth Overview (Keep for backward compatibility) -->
-    <div class="row mb-4">
-        <!-- <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Follower Growth</h6>
-                    <h3 class="<?php echo $follower_growth >= 10 ? 'text-success' : 'text-warning'; ?>">
-                        <?php echo number_format($follower_growth, 1); ?>%
-                    </h3>
-                    <small class=3text-muted">Total Followers</small>
-                    <div class="mt-2">
-                        <small class="text-muted"><?php echo number_format($current_period_stats['total_followers']); ?> total</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Engagement Growth</h6>
-                    <h3 class="<?php echo $engagement_growth >= 10 ? 'text-success' : 'text-warning'; ?>">
-                        <?php echo number_format($engagement_growth, 1); ?>%
-                    </h3>
-                    <small class="text-muted">Total Engagements</small>
-                    <div class="mt-2">
-                        <small class="text-muted"><?php echo number_format($current_period_stats['total_engagements']); ?> total</small>
-                    </div>
-                </div>
-            </div>
-        </div> -->
-        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Active Platforms</h6>
-                    <h3 class="text-info"><?php echo $current_period_stats['platform_count']; ?></h3>
-                    <small class="text-muted">Platforms Tracked</small>
-                    <div class="mt-2">
-                        <small class="text-muted"><?php echo $current_period_stats['country_count']; ?> countries</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Engagement Rate</h6>
-                    <h3 class="text-primary">
-                        <?php 
-                        $avg_engagement_rate = $current_period_stats['total_followers'] > 0 ? 
-                            ($current_period_stats['total_engagements'] / $current_period_stats['total_followers'] * 100) : 0;
-                        echo number_format($avg_engagement_rate, 2); ?>%
-                    </h3>
-                    <small class="text-muted">Average Rate</small>
-                    <div class="mt-2">
-                        <span class="badge bg-<?php echo $avg_engagement_rate >= 5 ? 'success' : ($avg_engagement_rate >= 2 ? 'warning' : 'danger'); ?>">
-                            Industry: <?php echo $avg_engagement_rate >= 5 ? 'High' : ($avg_engagement_rate >= 2 ? 'Medium' : 'Low'); ?>
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-lg-3 col-md-4 col-6 mb-3">
-            <div class="card stat-card h-100">
-                <div class="card-body text-center">
-                    <h6 class="card-title">Content Performance</h6>
-                    <h3 class="text-dark">
-                        <?php echo !empty($content_stats) ? number_format(max(array_column($content_stats, 'avg_engagement')), 0) : 0; ?>
-                    </h3>
-                    <small class="text-muted">Top Avg Engagement</small>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            <?php echo !empty($content_stats) ? $content_stats[0]['content_type'] : 'No data'; ?>
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Enhanced Charts Row -->
+    <!-- Enhanced Charts Section with Country Breakdown -->
     <div class="row mb-4">
         <!-- Platform Performance by Country -->
         <div class="col-lg-6 mb-4">
@@ -690,39 +541,21 @@ foreach (array_keys($country_growth_chart_data) as $country) {
                     <h6 class="mb-0">Platform Followers by Country</h6>
                 </div>
                 <div class="card-body">
-                    <div class="chart-container bar">
+                    <div class="chart-container">
                         <canvas id="platformCountryChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Platform Growth Trends -->
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Platform Growth Trends</h6>
-                    <span class="badge bg-info"><?php echo ucfirst($trend_interval); ?> View</span>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container line">
-                        <canvas id="platformGrowthChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Country Performance Charts -->
-    <div class="row mb-4">
         <!-- Country Performance by Platform -->
-        <div class="col-lg-12 mb-4">
+        <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
                     <h6 class="mb-0">Country Performance by Platform</h6>
                 </div>
                 <div class="card-body">
-                    <div class="chart-container bar">
+                    <div class="chart-container">
                         <canvas id="countryPlatformChart"></canvas>
                     </div>
                 </div>
@@ -730,10 +563,29 @@ foreach (array_keys($country_growth_chart_data) as $country) {
         </div>
     </div>
 
-    <!-- Platform Performance Details -->
+    <!-- Growth Trends by Country -->
+    <div class="row mb-4">
+        <!-- Platform Growth Trends by Country -->
+        <div class="col-lg-12 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Platform Growth Trends by Country</h6>
+                    <span class="badge bg-info"><?php echo ucfirst($trend_interval); ?> View</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="platformGrowthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Platform Performance Table -->
     <div class="card mb-4">
-        <div class="card-header">
-            <h6 class="mb-0">Platform Performance by Country</h6>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Platform Performance Details by Country</h6>
+            <span class="badge bg-info"><?php echo $period_label; ?></span>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -742,43 +594,38 @@ foreach (array_keys($country_growth_chart_data) as $country) {
                         <tr>
                             <th>Platform</th>
                             <th>Country</th>
-                            <th>Followers</th>
+                            <th>Current Followers</th>
                             <th>Engagements</th>
                             <th>Engagement Rate</th>
-                            <th>Likes</th>
-                            <th>Shares</th>
-                            <th>Comments</th>
-                            <th>Performance</th>
+                            <th>Growth %</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($platform_country_stats as $stat): ?>
+                            <?php 
+                            $platform_growth = $growth_data[$stat['platform']]['growth'] ?? 0;
+                            ?>
                             <tr>
-                                <td><strong><?php echo htmlspecialchars($stat['platform']); ?></strong></td>
+                                <td><strong><?php echo $stat['platform']; ?></strong></td>
                                 <td>
                                     <span class="flag-icon"><?php echo substr($stat['country'], 0, 2); ?></span>
-                                    <?php echo htmlspecialchars($stat['country']); ?>
+                                    <?php echo $stat['country']; ?>
                                 </td>
                                 <td><?php echo number_format($stat['current_followers']); ?></td>
                                 <td><?php echo number_format($stat['current_engagements']); ?></td>
                                 <td>
-                                    <span class="badge bg-<?php echo $stat['avg_engagement_rate'] >= 5 ? 'success' : ($stat['avg_engagement_rate'] >= 2 ? 'warning' : 'danger'); ?>">
-                                        <?php echo number_format($stat['avg_engagement_rate'], 2); ?>%
+                                    <span class="badge bg-<?php echo $stat['engagement_rate'] >= 5 ? 'success' : ($stat['engagement_rate'] >= 2 ? 'warning' : 'danger'); ?>">
+                                        <?php echo number_format($stat['engagement_rate'], 2); ?>%
                                     </span>
                                 </td>
-                                <td><?php echo number_format($stat['total_likes']); ?></td>
-                                <td><?php echo number_format($stat['total_shares']); ?></td>
-                                <td><?php echo number_format($stat['total_comments']); ?></td>
+                                <td class="<?php echo $platform_growth >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                    <?php echo ($platform_growth >= 0 ? '+' : '') . number_format($platform_growth, 1); ?>%
+                                </td>
                                 <td>
-                                    <?php 
-                                    $performance_score = $stat['avg_engagement_rate'] * log10($stat['current_followers'] + 1);
-                                    if ($performance_score >= 100): ?>
-                                        <span class="badge bg-success">Excellent</span>
-                                    <?php elseif ($performance_score >= 50): ?>
-                                        <span class="badge bg-warning">Good</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-info">Average</span>
-                                    <?php endif; ?>
+                                    <span class="badge bg-<?php echo $platform_growth >= 10 ? 'success' : ($platform_growth >= 0 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $platform_growth >= 10 ? 'Strong' : ($platform_growth >= 0 ? 'Stable' : 'Declining'); ?>
+                                    </span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -789,12 +636,11 @@ foreach (array_keys($country_growth_chart_data) as $country) {
     </div>
 </div>
 
-<!-- JavaScript remains the same -->
 <script>
 // Platform Performance by Country Chart
 const platformCountryCtx = document.getElementById('platformCountryChart').getContext('2d');
 const platformCountryData = {
-    labels: <?php echo json_encode($countries); ?>,
+    labels: <?php echo json_encode(array_column($countries, 'country')); ?>,
     datasets: [
         <?php foreach ($platforms as $platform): ?>
         {
@@ -802,8 +648,8 @@ const platformCountryData = {
             data: [
                 <?php foreach ($countries as $country): ?>
                 <?php 
-                    $value = isset($platform_country_matrix[$platform['name']][$country]) 
-                        ? $platform_country_matrix[$platform['name']][$country]['current_followers'] 
+                    $value = isset($platform_country_matrix[$platform['name']][$country['country']]) 
+                        ? $platform_country_matrix[$platform['name']][$country['country']]['current_followers'] 
                         : 0;
                     echo $value . ',';
                 ?>
@@ -854,69 +700,6 @@ new Chart(platformCountryCtx, {
     }
 });
 
-// Platform Growth Trends Chart
-const platformGrowthCtx = document.getElementById('platformGrowthChart').getContext('2d');
-const platformGrowthData = {
-    labels: <?php echo json_encode($formatted_periods); ?>,
-    datasets: [
-        <?php foreach ($platforms as $platform): ?>
-        {
-            label: '<?php echo $platform['name']; ?>',
-            data: [
-                <?php 
-                foreach ($all_periods as $period): 
-                    $value = isset($period_platform_data[$platform['name']][$period]) 
-                        ? $period_platform_data[$platform['name']][$period] 
-                        : null;
-                    echo $value !== null ? $value : 'null';
-                    echo ',';
-                endforeach; 
-                ?>
-            ],
-            borderColor: '<?php echo $platform_colors[$platform['name']] ?? '#666666'; ?>',
-            backgroundColor: '<?php echo $platform_colors[$platform['name']] ?? '#666666'; ?>22',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            spanGaps: true
-        },
-        <?php endforeach; ?>
-    ]
-};
-
-new Chart(platformGrowthCtx, {
-    type: 'line',
-    data: platformGrowthData,
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            title: {
-                display: true,
-                text: '<?php echo ucfirst($trend_interval); ?> Follower Growth by Platform'
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        if (value >= 1000000) {
-                            return (value / 1000000).toFixed(1) + 'M';
-                        } else if (value >= 1000) {
-                            return (value / 1000).toFixed(1) + 'K';
-                        }
-                        return value;
-                    }
-                }
-            }
-        }
-    }
-});
-
 // Country Performance by Platform Chart
 const countryPlatformCtx = document.getElementById('countryPlatformChart').getContext('2d');
 const countryPlatformData = {
@@ -924,19 +707,19 @@ const countryPlatformData = {
     datasets: [
         <?php foreach ($countries as $country): ?>
         {
-            label: '<?php echo $country; ?>',
+            label: '<?php echo $country['country']; ?>',
             data: [
                 <?php foreach ($platforms as $platform): ?>
                 <?php 
-                    $value = isset($platform_country_matrix[$platform['name']][$country]) 
-                        ? $platform_country_matrix[$platform['name']][$country]['current_followers'] 
+                    $value = isset($platform_country_matrix[$platform['name']][$country['country']]) 
+                        ? $platform_country_matrix[$platform['name']][$country['country']]['current_followers'] 
                         : 0;
                     echo $value . ',';
                 ?>
                 <?php endforeach; ?>
             ],
-            backgroundColor: '<?php echo $country_colors[$country] ?? '#666666'; ?>',
-            borderColor: '<?php echo $country_colors[$country] ?? '#666666'; ?>',
+            backgroundColor: '<?php echo $country_colors[$country['country']] ?? '#666666'; ?>',
+            borderColor: '<?php echo $country_colors[$country['country']] ?? '#666666'; ?>',
             borderWidth: 1
         },
         <?php endforeach; ?>
@@ -979,6 +762,69 @@ new Chart(countryPlatformCtx, {
         }
     }
 });
+
+// Platform Growth Trends by Country Chart
+const platformGrowthCtx = document.getElementById('platformGrowthChart').getContext('2d');
+
+// Prepare data for platform growth trends
+const platformGrowthDatasets = [];
+<?php foreach ($platforms as $platform): ?>
+    <?php foreach ($countries as $country): ?>
+        <?php if (isset($period_platform_country_data[$platform['name']][$country['country']])): ?>
+            platformGrowthDatasets.push({
+                label: '<?php echo $platform['name']; ?> - <?php echo $country['country']; ?>',
+                data: [
+                    <?php foreach ($all_periods as $period): ?>
+                        <?php echo $period_platform_country_data[$platform['name']][$country['country']][$period] ?? 'null'; ?>,
+                    <?php endforeach; ?>
+                ],
+                borderColor: '<?php echo $platform_colors[$platform['name']] ?? '#666666'; ?>',
+                backgroundColor: '<?php echo $platform_colors[$platform['name']] ?? '#666666'; ?>22',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+            });
+        <?php endif; ?>
+    <?php endforeach; ?>
+<?php endforeach; ?>
+
+const platformGrowthData = {
+    labels: <?php echo json_encode($formatted_periods); ?>,
+    datasets: platformGrowthDatasets
+};
+
+new Chart(platformGrowthCtx, {
+    type: 'line',
+    data: platformGrowthData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: '<?php echo ucfirst($trend_interval); ?> Follower Growth Trends'
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        if (value >= 1000000) {
+                            return (value / 1000000).toFixed(1) + 'M';
+                        } else if (value >= 1000) {
+                            return (value / 1000).toFixed(1) + 'K';
+                        }
+                        return value;
+                    }
+                }
+            }
+        }
+    }
+});
 </script>
 
 <style>
@@ -988,10 +834,20 @@ new Chart(countryPlatformCtx, {
     width: 100%;
 }
 .stat-card {
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 .stat-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+.card-header {
+    background: rgba(0,0,0,0.03);
+    border-bottom: 1px solid rgba(0,0,0,0.125);
+}
+.progress {
+    background-color: #e9ecef;
 }
 .flag-icon {
     display: inline-block;
@@ -1000,6 +856,10 @@ new Chart(countryPlatformCtx, {
     background: #ddd;
     margin-right: 5px;
     border-radius: 2px;
+    text-align: center;
+    line-height: 15px;
+    font-size: 10px;
+    font-weight: bold;
 }
 </style>
 
