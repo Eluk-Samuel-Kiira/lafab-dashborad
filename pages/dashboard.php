@@ -8,7 +8,7 @@ $country_filter = $_GET['country'] ?? '';
 $date_filter = $_GET['date_range'] ?? 'month';
 
 // Countries for filter
-$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia'];
+$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia', 'Malawi'];
 
 // Calculate date ranges based on filter
 $today = date('Y-m-d');

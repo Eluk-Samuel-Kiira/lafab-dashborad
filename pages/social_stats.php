@@ -277,6 +277,7 @@ $country_colors = [
     'Tanzania' => '#45B7D1',
     'Rwanda' => '#96CEB4',
     'Zambia' => '#FFEAA7',
+    'Malawi' => '#eeee19ff',
     'Other' => '#BDC3C7'
 ];
 

@@ -87,7 +87,8 @@ $country_colors = [
     'greatkenyanjobs.com' => '#198754',     // Green  
     'greattanzaniajobs.com' => '#0d6efd',   // Blue
     'greatrwandajobs.com' => '#ffc107',     // Yellow
-    'greatzambiajobs.com' => '#6f42c1'      // Purple
+    'greatzambiajobs.com' => '#6f42c1',     // Purple
+    'greatmalawijobs.com' => '#d2d3c2ff'      // Purple
 ];
 
 $country_names = [
@@ -95,7 +96,8 @@ $country_names = [
     'greatkenyanjobs.com' => 'Kenya',
     'greattanzaniajobs.com' => 'Tanzania', 
     'greatrwandajobs.com' => 'Rwanda',
-    'greatzambiajobs.com' => 'Zambia'
+    'greatzambiajobs.com' => 'Zambia',
+    'greatmalawijobs.com' => 'Malawi'
 ];
 
 // Initialize data structure for all websites

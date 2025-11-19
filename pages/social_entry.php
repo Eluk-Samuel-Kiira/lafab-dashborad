@@ -26,7 +26,7 @@ if (isset($_POST['delete_stat_id'])) {
 $platforms = db_fetch_all("SELECT * FROM social_media_platforms ORDER BY name");
 
 // Countries
-$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia'];
+$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia', 'Malawi'];
 
 // Content types
 $content_types = [

@@ -21,7 +21,8 @@ $websites = [
     'greatkenyanjobs.com', 
     'greattanzaniajobs.com',
     'greatrwandajobs.com',
-    'greatzambiajobs.com'
+    'greatzambiajobs.com',
+    'greatmalawijobs.com'
 ];
 
 // Helper function to execute queries

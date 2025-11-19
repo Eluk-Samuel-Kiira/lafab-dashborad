@@ -19,7 +19,7 @@ $country_filter = $_GET['country'] ?? '';
 $poster_filter = $_GET['poster'] ?? '';
 
 // Countries and posters for filters
-$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia'];
+$countries = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Zambia', 'Malawi'];
 $all_posters = db_fetch_all("SELECT name FROM posters WHERE is_active = 1 ORDER BY name");
 
 // Build WHERE conditions for queries
@@ -124,6 +124,7 @@ $country_distribution = db_fetch_all("
             WHEN j.website LIKE '%tanzania%' THEN 'Tanzania'
             WHEN j.website LIKE '%rwanda%' THEN 'Rwanda'
             WHEN j.website LIKE '%zambia%' THEN 'Zambia'
+            WHEN j.website LIKE '%malawi%' THEN 'Malawi'
             ELSE 'Other'
         END as country,
         SUM(j.job_count) as jobs
@@ -413,6 +414,7 @@ foreach ($poster_stats as $stat) {
                             <th>Tanzania</th>
                             <th>Rwanda</th>
                             <th>Zambia</th>
+                            <th>Malawi</th>
                             <th>Other</th>
                             <th>Total</th>
                         </tr>
@@ -425,6 +427,7 @@ foreach ($poster_stats as $stat) {
                             'Tanzania' => 0,
                             'Rwanda' => 0,
                             'Zambia' => 0,
+                            'Malawi' => 0,
                             'Other' => 0
                         ];
                         
@@ -439,6 +442,7 @@ foreach ($poster_stats as $stat) {
                                 'Tanzania' => 0,
                                 'Rwanda' => 0,
                                 'Zambia' => 0,
+                                'Malawi' => 0,
                                 'Other' => 0
                             ];
                             
@@ -487,6 +491,13 @@ foreach ($poster_stats as $stat) {
                                     <?php endif; ?>
                                 </td>
                                 <td>
+                                    <?php if ($country_data['Malawi'] > 0): ?>
+                                        <span class="badge bg-danger"><?php echo $country_data['Malawi']; ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
                                     <?php if ($country_data['Other'] > 0): ?>
                                         <span class="badge bg-secondary"><?php echo $country_data['Other']; ?></span>
                                     <?php else: ?>
@@ -506,6 +517,7 @@ foreach ($poster_stats as $stat) {
                             <td><strong class="text-primary"><?php echo $country_totals['Tanzania']; ?></strong></td>
                             <td><strong class="text-primary"><?php echo $country_totals['Rwanda']; ?></strong></td>
                             <td><strong class="text-primary"><?php echo $country_totals['Zambia']; ?></strong></td>
+                            <td><strong class="text-primary"><?php echo $country_totals['Malawi']; ?></strong></td>
                             <td><strong class="text-primary"><?php echo $country_totals['Other']; ?></strong></td>
                             <td><strong class="text-primary"><?php echo array_sum($country_totals); ?></strong></td>
                         </tr>

@@ -80,8 +80,27 @@ $posters = db_fetch_all("SELECT name FROM posters WHERE is_active = 1 ORDER BY n
 // Set default date to yesterday
 $default_date = date('Y-m-d', strtotime('-1 day'));
 
-// Get recent job postings (individual entries with IDs for deletion)
-$recent_jobs = db_fetch_all("
+// Handle search functionality
+$search_term = '';
+$where_conditions = [];
+$query_params = [];
+
+if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
+    $search_term = trim($_GET['search']);
+    $where_conditions[] = "(poster_name LIKE ? OR website LIKE ?)";
+    $search_param = "%{$search_term}%";
+    $query_params[] = $search_param;
+    $query_params[] = $search_param;
+}
+
+// Build the WHERE clause
+$where_clause = '';
+if (!empty($where_conditions)) {
+    $where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
+}
+
+// Get recent job postings (latest 30 entries with search functionality)
+$recent_jobs_query = "
     SELECT 
         id,
         website,
@@ -90,9 +109,26 @@ $recent_jobs = db_fetch_all("
         job_count,
         created_at
     FROM job_postings 
+    {$where_clause}
     ORDER BY post_date DESC, created_at DESC 
-    LIMIT 20
-");
+    LIMIT 30
+";
+
+$recent_jobs = db_fetch_all($recent_jobs_query, $query_params);
+
+// Get total count for stats (without search)
+$total_count_query = "SELECT COUNT(*) as total FROM job_postings";
+$total_count_result = db_fetch_one($total_count_query);
+$total_entries = $total_count_result['total'];
+
+// Get filtered count for stats (with search)
+if (!empty($where_conditions)) {
+    $filtered_count_query = "SELECT COUNT(*) as total FROM job_postings {$where_clause}";
+    $filtered_count_result = db_fetch_one($filtered_count_query, $query_params);
+    $filtered_entries = $filtered_count_result['total'];
+} else {
+    $filtered_entries = $total_entries;
+}
 ?>
 
 <div class="col-md-9 col-lg-10 main-content">
@@ -203,13 +239,40 @@ $recent_jobs = db_fetch_all("
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0"><i class="fas fa-history"></i> Recent Job Postings</h6>
-            <span class="badge bg-primary"><?php echo count($recent_jobs); ?> entries</span>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-primary me-2">
+                    <?php echo $filtered_entries; ?> of <?php echo $total_entries; ?> entries
+                </span>
+                <form method="GET" class="d-flex">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="search" class="form-control" placeholder="Search posters or websites..." 
+                               value="<?php echo htmlspecialchars($search_term); ?>" style="width: 250px;">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <?php if (!empty($search_term)): ?>
+                            <a href="?" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
         </div>
         <div class="card-body">
             <?php if (empty($recent_jobs)): ?>
                 <div class="text-center py-4">
                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                    <p class="text-muted">No recent job postings found.</p>
+                    <p class="text-muted">
+                        <?php if (!empty($search_term)): ?>
+                            No job postings found for "<?php echo htmlspecialchars($search_term); ?>".
+                        <?php else: ?>
+                            No job postings found.
+                        <?php endif; ?>
+                    </p>
+                    <?php if (!empty($search_term)): ?>
+                        <a href="?" class="btn btn-outline-primary">Clear Search</a>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
@@ -267,7 +330,7 @@ $recent_jobs = db_fetch_all("
                         <div class="card bg-light border-0">
                             <div class="card-body text-center py-2">
                                 <h6 class="mb-0 text-primary"><?php echo count($recent_jobs); ?></h6>
-                                <small class="text-muted">Total Entries</small>
+                                <small class="text-muted">Displayed</small>
                             </div>
                         </div>
                     </div>
@@ -311,6 +374,15 @@ $recent_jobs = db_fetch_all("
                         </div>
                     </div>
                 </div>
+                
+                <!-- Search Info -->
+                <?php if (!empty($search_term)): ?>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle"></i> 
+                        Showing <?php echo $filtered_entries; ?> entries matching "<strong><?php echo htmlspecialchars($search_term); ?></strong>"
+                        <a href="?" class="float-end btn btn-sm btn-outline-primary">Show All Entries</a>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
@@ -386,6 +458,13 @@ document.getElementById('jobForm').addEventListener('submit', function(e) {
 document.querySelector('input[name="poster_name"]').addEventListener('change', checkExistingEntries);
 document.querySelector('input[name="post_date"]').addEventListener('change', checkExistingEntries);
 document.querySelector('select[name="website"]').addEventListener('change', checkExistingEntries);
+
+// Auto-focus search input when page loads with search term
+<?php if (!empty($search_term)): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelector('input[name="search"]').focus();
+});
+<?php endif; ?>
 </script>
 
 <style>
@@ -436,6 +515,11 @@ form[style*="display: inline"] {
 
 .table td {
     vertical-align: middle;
+}
+
+/* Search input styling */
+.input-group-sm {
+    max-width: 300px;
 }
 </style>
 
