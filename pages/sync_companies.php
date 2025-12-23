@@ -16,7 +16,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_log' && isset($_GET['i
     $deleteMessage = '';
     
     try {
-        $teamDb = Database::getInstance(DB_TEAM);
+        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
         
         // Delete the log
         $delete_sql = "DELETE FROM " . TABLE_SYNC_LOGS . " WHERE id = ?";
@@ -48,7 +48,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete_all_logs') {
     $deleteMessage = '';
     
     try {
-        $teamDb = Database::getInstance(DB_TEAM);
+        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
         
         // Count logs before deletion
         $count_result = $teamDb->query("SELECT COUNT(*) as total FROM " . TABLE_SYNC_LOGS);
@@ -211,8 +211,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
     
     try {
         // Get database instances using credentials from config
-        $jobDb = Database::getInstance(DB_JOBS);
-        $teamDb = Database::getInstance(DB_TEAM);
+        $jobDb = Database::getInstance(DB_JOBS_NAME);  // ← CHANGED: DB_JOBS to DB_JOBS_NAME
+        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
         
         // Create logs table if not exists
         createLogsTable($teamDb);
@@ -377,7 +377,7 @@ if (isset($_GET['message'])) {
 
 // Get sync logs
 try {
-    $logsDb = Database::getInstance(DB_TEAM);
+    $logsDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
     $logs = [];
     
     $result = $logsDb->query(
@@ -396,8 +396,8 @@ try {
 
 // Get statistics
 try {
-    $statsJobDb = Database::getInstance(DB_JOBS);
-    $statsTeamDb = Database::getInstance(DB_TEAM);
+    $statsJobDb = Database::getInstance(DB_JOBS_NAME); // ← CHANGED: DB_JOBS to DB_JOBS_NAME
+    $statsTeamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
     
     // Job site count
     $result = $statsJobDb->query("SELECT COUNT(*) as total FROM " . TABLE_JOBS_COMPANIES);
@@ -424,6 +424,7 @@ try {
     $jobCount = $teamCount = $syncedCount = $pending = 0;
 }
 ?>
+
 
 <!-- RESTORE YOUR ORIGINAL UI STRUCTURE -->
 <div class="col-md-9 col-lg-10 main-content">

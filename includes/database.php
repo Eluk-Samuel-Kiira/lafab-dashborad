@@ -1,14 +1,24 @@
 <?php
-// database.php - Reusable Database Connection Class
-// =================================================
+// database.php - Reusable Database Connection Class with getDBCredentials()
+// ==========================================================================
 
 class Database {
     private static $instances = [];
     private $connection;
     private $database;
+    private $host;
+    private $user;
+    private $pass;
     
     private function __construct($db_name) {
         $this->database = $db_name;
+        
+        // Get credentials for this specific database using getDBCredentials()
+        $credentials = getDBCredentials($db_name);
+        $this->host = $credentials['host'];
+        $this->user = $credentials['user'];
+        $this->pass = $credentials['pass'];
+        
         $this->connect();
     }
     
@@ -20,7 +30,7 @@ class Database {
     }
     
     private function connect() {
-        $this->connection = new mysqli(DB_HOST, DB_USER, DB_PASS, $this->database);
+        $this->connection = new mysqli($this->host, $this->user, $this->pass, $this->database);
         
         if ($this->connection->connect_error) {
             throw new Exception("Database connection failed ({$this->database}): " . $this->connection->connect_error);
@@ -125,6 +135,16 @@ class Database {
         }
         
         return $columns;
+    }
+    
+    // Debug method to show current connection info
+    public function getConnectionInfo() {
+        return [
+            'database' => $this->database,
+            'host' => $this->host,
+            'user' => $this->user,
+            'connected' => $this->connection ? $this->connection->ping() : false
+        ];
     }
 }
 ?>
