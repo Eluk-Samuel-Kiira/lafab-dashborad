@@ -35,6 +35,10 @@ $nav_items = [
     'social_entry.php' => [
         'icon' => 'fa-share-alt',
         'text' => 'Add Social Media'
+    ],
+    'sync_companies.php' => [
+        'icon' => 'fa-sync-alt', 
+        'text' => 'Sync Companies'
     ]
 ];
 ?>
