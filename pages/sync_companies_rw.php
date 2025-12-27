@@ -5,6 +5,9 @@ require_once '../includes/database.php';
 // Define that we're including this file
 define('INCLUDED', true);
 
+// Force country to Rwanda for this sync
+define('FORCE_COUNTRY', 'Rwanda');
+
 // TABLE NAMES DEFINED HERE (not in config)
 define('TABLE_JOBS_COMPANIES', 'icop0_js_job_companies');
 define('TABLE_TEAM_COMPANIES', 'pc0ww__js_job_companies');
@@ -16,7 +19,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_log' && isset($_GET['i
     $deleteMessage = '';
     
     try {
-        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
+        $teamDb = Database::getInstance(DB_TEAM_NAME);
         
         // Delete the log
         $delete_sql = "DELETE FROM " . TABLE_SYNC_LOGS . " WHERE id = ?";
@@ -33,12 +36,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete_log' && isset($_GET['i
         $teamDb->close();
         
         // Redirect with message
-        header("Location: sync_companies.php?message=" . urlencode($deleteMessage));
+        header("Location: sync_companies_rw.php?message=" . urlencode($deleteMessage));
         exit();
         
     } catch (Exception $e) {
         $deleteMessage = "error:❌ Failed to delete log: " . $e->getMessage();
-        header("Location: sync_companies.php?message=" . urlencode($deleteMessage));
+        header("Location: sync_companies_rw.php?message=" . urlencode($deleteMessage));
         exit();
     }
 }
@@ -48,7 +51,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete_all_logs') {
     $deleteMessage = '';
     
     try {
-        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
+        $teamDb = Database::getInstance(DB_TEAM_NAME);
         
         // Count logs before deletion
         $count_result = $teamDb->query("SELECT COUNT(*) as total FROM " . TABLE_SYNC_LOGS);
@@ -69,12 +72,12 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete_all_logs') {
         $teamDb->close();
         
         // Redirect with message
-        header("Location: sync_companies.php?message=" . urlencode($deleteMessage));
+        header("Location: sync_companies_rw.php?message=" . urlencode($deleteMessage));
         exit();
         
     } catch (Exception $e) {
         $deleteMessage = "error:❌ Failed to delete logs: " . $e->getMessage();
-        header("Location: sync_companies.php?message=" . urlencode($deleteMessage));
+        header("Location: sync_companies_rw.php?message=" . urlencode($deleteMessage));
         exit();
     }
 }
@@ -85,19 +88,66 @@ require_once '../includes/sidebar.php';
 
 // Create logs table if not exists
 function createLogsTable($teamDb) {
-    $sql = "CREATE TABLE IF NOT EXISTS " . TABLE_SYNC_LOGS . " (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        sync_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-        total_companies INT DEFAULT 0,
-        new_companies INT DEFAULT 0,
-        updated_companies INT DEFAULT 0,
-        errors INT DEFAULT 0,
-        processing_time DECIMAL(5,2) DEFAULT 0,
-        log_details TEXT,
-        INDEX idx_sync_date (sync_date)
-    ) ENGINE=InnoDB DEFAULT CHARSET=" . DB_CHARSET;
+    // First check if logs table exists
+    $check_sql = "SHOW TABLES LIKE '" . TABLE_SYNC_LOGS . "'";
+    $result = $teamDb->query($check_sql);
     
-    return $teamDb->query($sql);
+    if ($result->num_rows == 0) {
+        // Create new table with country field
+        $sql = "CREATE TABLE " . TABLE_SYNC_LOGS . " (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sync_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            country VARCHAR(50) DEFAULT 'Rwanda',
+            total_companies INT DEFAULT 0,
+            new_companies INT DEFAULT 0,
+            updated_companies INT DEFAULT 0,
+            errors INT DEFAULT 0,
+            processing_time DECIMAL(5,2) DEFAULT 0,
+            log_details TEXT,
+            INDEX idx_sync_date (sync_date),
+            INDEX idx_country (country)
+        ) ENGINE=InnoDB DEFAULT CHARSET=" . DB_CHARSET;
+        
+        return $teamDb->query($sql);
+    } else {
+        // Table exists, check if country column exists
+        $check_column = "SHOW COLUMNS FROM " . TABLE_SYNC_LOGS . " LIKE 'country'";
+        $column_result = $teamDb->query($check_column);
+        
+        if ($column_result->num_rows == 0) {
+            // Add country column to existing table
+            $alter_sql = "ALTER TABLE " . TABLE_SYNC_LOGS . " ADD COLUMN country VARCHAR(50) DEFAULT 'Rwanda' AFTER sync_date";
+            $teamDb->query($alter_sql);
+            
+            // Add index for country
+            $index_sql = "ALTER TABLE " . TABLE_SYNC_LOGS . " ADD INDEX idx_country (country)";
+            $teamDb->query($index_sql);
+        }
+        return true;
+    }
+}
+
+// Function to force country field to be Rwanda
+function forceCountryToRwanda($company) {
+    // Force country field to be Rwanda
+    $company['country'] = FORCE_COUNTRY;
+    
+    // Update state if it contains other country names
+    if (isset($company['state']) && !empty($company['state'])) {
+        $company['state'] = str_ireplace(['Uganda', 'Kenya', 'Tanzania', 'Zambia', 'Malawi'], FORCE_COUNTRY, $company['state']);
+    }
+    
+    // Update location if it contains other country names
+    if (isset($company['location']) && !empty($company['location'])) {
+        $company['location'] = str_ireplace(['Uganda', 'Kenya', 'Tanzania', 'Zambia', 'Malawi'], FORCE_COUNTRY, $company['location']);
+    }
+    
+    // Update city if it contains other country names
+    if (isset($company['city']) && !empty($company['city'])) {
+        $company['city'] = str_ireplace(['Uganda', 'Kenya', 'Tanzania', 'Zambia', 'Malawi'], FORCE_COUNTRY, $company['city']);
+    }
+    
+    return $company;
 }
 
 // Bulk insert function
@@ -114,6 +164,9 @@ function bulkInsertCompanies($teamDb, $companies, $teamColumns) {
         $values = [];
         
         foreach ($chunk as $company) {
+            // Force country to Rwanda
+            $company = forceCountryToRwanda($company);
+            
             $rowValues = [];
             
             // Build values based on team table columns
@@ -160,6 +213,9 @@ function bulkUpdateCompanies($teamDb, $companies, $teamColumns) {
         $values = [];
         
         foreach ($chunk as $company) {
+            // Force country to Rwanda
+            $company = forceCountryToRwanda($company);
+            
             $rowValues = [];
             
             foreach ($teamColumns as $column) {
@@ -211,10 +267,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
     
     try {
         // Get database instances using credentials from config
-        $jobDb = Database::getInstance(DB_JOBS_NAME);  // ← CHANGED: DB_JOBS to DB_JOBS_NAME
-        $teamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
+        $jobDb = Database::getInstance(DB_JOBS_NAME);
+        $teamDb = Database::getInstance(DB_TEAM_NAME);
         
-        // Create logs table if not exists
+        // Create logs table if not exists (or update it)
         createLogsTable($teamDb);
         
         // Get team table columns
@@ -227,17 +283,20 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
             $teamColumns = $teamDb->getTableColumns(TABLE_TEAM_COMPANIES); // Refresh
         }
         
-        // Get ALL companies from Job site
+        // Get ALL companies from Job site (no country filter since all are Rwanda)
         $result = $jobDb->query("SELECT * FROM " . TABLE_JOBS_COMPANIES);
+        
         $total = $result->num_rows;
         $new = 0;
         $updated = 0;
         $errors = 0;
         $log_details = [];
         
-        $log_details[] = "=== SYNC STARTED " . date('Y-m-d H:i:s') . " ===";
-        $log_details[] = "Total companies to sync: " . $total;
+        $log_details[] = "=== RWANDA COMPANY SYNC STARTED " . date('Y-m-d H:i:s') . " ===";
+        $log_details[] = "Total companies in source table: " . $total;
+        $log_details[] = "Note: All companies are from Rwanda (table contains only Rwanda data)";
         $log_details[] = "Team table has " . count($teamColumns) . " columns";
+        $log_details[] = "Country enforcement: All companies will be set to '" . FORCE_COUNTRY . "'";
         
         // Fetch all companies at once
         $allCompanies = [];
@@ -265,7 +324,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
             }
         }
         
-        $log_details[] = "Found " . count($existingIds) . " existing companies";
+        $log_details[] = "Found " . count($existingIds) . " existing companies in team site";
         
         // Separate new and existing companies
         $newCompanies = [];
@@ -311,36 +370,38 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
         // Calculate processing time
         $processing_time = round(microtime(true) - $start_time, 2);
         
-        // Save log
-        $log_details[] = "=== SYNC COMPLETED IN {$processing_time}s ===";
+        // Save log with country info
+        $log_details[] = "=== RWANDA SYNC COMPLETED IN {$processing_time}s ===";
         $log_details[] = "Total: $total | New: $new | Updated: $updated | Errors: $errors";
+        $log_details[] = "All companies forced to country: '" . FORCE_COUNTRY . "'";
         
         $log_text = implode("\n", $log_details);
         $log_sql = "INSERT INTO " . TABLE_SYNC_LOGS . " 
-                   (total_companies, new_companies, updated_companies, errors, processing_time, log_details) 
-                   VALUES (?, ?, ?, ?, ?, ?)";
+                   (country, total_companies, new_companies, updated_companies, errors, processing_time, log_details) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)";
         
-        $teamDb->preparedQuery($log_sql, [$total, $new, $updated, $errors, $processing_time, $log_text]);
+        $teamDb->preparedQuery($log_sql, [FORCE_COUNTRY, $total, $new, $updated, $errors, $processing_time, $log_text]);
         
-        $success = "✅ Sync completed in {$processing_time} seconds!<br>
+        $success = "✅ Rwanda Company Sync completed in {$processing_time} seconds!<br>
                    • Total processed: $total companies<br>
                    • New companies: $new<br>
                    • Updated companies: $updated<br>
-                   • Errors: $errors";
+                   • Errors: $errors<br>
+                   • All companies set to: " . FORCE_COUNTRY;
         
     } catch (Exception $e) {
-        $error = "❌ Sync failed: " . $e->getMessage();
+        $error = "❌ Rwanda Company Sync failed: " . $e->getMessage();
         
         // Log error if possible
         if (isset($teamDb)) {
             try {
-                $log_text = "=== SYNC FAILED " . date('Y-m-d H:i:s') . " ===\n";
+                $log_text = "=== RWANDA SYNC FAILED " . date('Y-m-d H:i:s') . " ===\n";
                 $log_text .= "Error: " . $e->getMessage() . "\n";
                 $log_text .= "=== SYNC ABORTED ===";
                 
                 $teamDb->preparedQuery(
-                    "INSERT INTO " . TABLE_SYNC_LOGS . " (total_companies, errors, log_details) VALUES (?, ?, ?)",
-                    [0, 1, $log_text]
+                    "INSERT INTO " . TABLE_SYNC_LOGS . " (country, total_companies, errors, log_details) VALUES (?, ?, ?, ?)",
+                    [FORCE_COUNTRY, 0, 1, $log_text]
                 );
             } catch (Exception $logError) {
                 // Ignore log errors
@@ -375,13 +436,16 @@ if (isset($_GET['message'])) {
     }
 }
 
-// Get sync logs
+// Get Rwanda sync logs only
 try {
-    $logsDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
+    $logsDb = Database::getInstance(DB_TEAM_NAME);
     $logs = [];
     
-    $result = $logsDb->query(
-        "SELECT * FROM " . TABLE_SYNC_LOGS . " ORDER BY sync_date DESC LIMIT " . MAX_LOG_ROWS
+    $result = $logsDb->preparedQuery(
+        "SELECT * FROM " . TABLE_SYNC_LOGS . " 
+         WHERE country = ? 
+         ORDER BY sync_date DESC LIMIT " . MAX_LOG_ROWS,
+        [FORCE_COUNTRY]
     );
     
     if ($result) {
@@ -396,40 +460,45 @@ try {
 
 // Get statistics
 try {
-    $statsJobDb = Database::getInstance(DB_JOBS_NAME); // ← CHANGED: DB_JOBS to DB_JOBS_NAME
-    $statsTeamDb = Database::getInstance(DB_TEAM_NAME); // ← CHANGED: DB_TEAM to DB_TEAM_NAME
+    $statsJobDb = Database::getInstance(DB_JOBS_NAME);
+    $statsTeamDb = Database::getInstance(DB_TEAM_NAME);
     
-    // Job site count
+    // Job site count (all are Rwanda)
     $result = $statsJobDb->query("SELECT COUNT(*) as total FROM " . TABLE_JOBS_COMPANIES);
     $jobCount = $result->fetch_assoc()['total'];
     
-    // Team site count and synced count
-    $result = $statsTeamDb->query("
-        SELECT 
-            COUNT(*) as total,
-            COUNT(CASE WHEN source_id IS NOT NULL THEN 1 END) as synced
-        FROM " . TABLE_TEAM_COMPANIES
+    // Team site count for Rwanda
+    $result = $statsTeamDb->preparedQuery(
+        "SELECT COUNT(*) as total FROM " . TABLE_TEAM_COMPANIES . " WHERE country = ?",
+        [FORCE_COUNTRY]
     );
+    $teamCount = $result->fetch_assoc()['total'];
     
-    $row = $result->fetch_assoc();
-    $teamCount = $row['total'];
-    $syncedCount = $row['synced'];
+    // Team site synced count for Rwanda (with source_id)
+    $result = $statsTeamDb->preparedQuery(
+        "SELECT COUNT(*) as synced FROM " . TABLE_TEAM_COMPANIES . " 
+         WHERE country = ? AND source_id IS NOT NULL",
+        [FORCE_COUNTRY]
+    );
+    $syncedCount = $result->fetch_assoc()['synced'];
     
-    $pending = $jobCount - $syncedCount;
+    // Pending sync count
+    $pendingCount = $jobCount - $syncedCount;
+    if ($pendingCount < 0) $pendingCount = 0;
     
     $statsJobDb->close();
     $statsTeamDb->close();
     
 } catch (Exception $e) {
-    $jobCount = $teamCount = $syncedCount = $pending = 0;
+    $jobCount = $teamCount = $syncedCount = $pendingCount = 0;
 }
 ?>
 
 
-<!-- RESTORE YOUR ORIGINAL UI STRUCTURE -->
+<!-- RWANDA-SPECIFIC UI -->
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2"><i class="fas fa-sync-alt"></i> Complete Company Sync</h1>
+        <h1 class="h2"><i class="fas fa-flag"></i> Rwanda Company Sync</h1>
         <div class="btn-group">
             <button type="button" class="btn btn-outline-primary" onclick="window.location.href='dashboard.php'">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -456,14 +525,23 @@ try {
         </div>
     <?php endif; ?>
 
+    <!-- Rwanda Info Alert -->
+    <div class="alert alert-info">
+        <h5><i class="fas fa-flag"></i> Rwanda-Specific Sync</h5>
+        <p class="mb-0">
+            <strong>Important:</strong> The source table contains only Rwanda companies. <br>
+            No country filter is applied during sync. Country is forced to 'Rwanda' during insertion.
+        </p>
+    </div>
+
     <!-- Statistics -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card text-white bg-primary">
                 <div class="card-body text-center">
                     <h3><?php echo $jobCount; ?></h3>
-                    <p>Job Site Companies</p>
-                    <small>All companies</small>
+                    <p>Source Table Companies</p>
+                    <small>(All are Rwanda companies)</small>
                 </div>
             </div>
         </div>
@@ -471,8 +549,8 @@ try {
             <div class="card text-white bg-success">
                 <div class="card-body text-center">
                     <h3><?php echo $teamCount; ?></h3>
-                    <p>Team Site Companies</p>
-                    <small>Total in team DB</small>
+                    <p>TeamSite Rwanda Companies</p>
+                    <small>With country = 'Rwanda'</small>
                 </div>
             </div>
         </div>
@@ -480,15 +558,15 @@ try {
             <div class="card text-white bg-info">
                 <div class="card-body text-center">
                     <h3><?php echo $syncedCount; ?></h3>
-                    <p>Synced Companies</p>
+                    <p>Synced Rwanda Companies</p>
                     <small>With source_id</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-white <?php echo $pending > 0 ? 'bg-warning' : 'bg-secondary'; ?>">
+            <div class="card text-white <?php echo $pendingCount > 0 ? 'bg-warning' : 'bg-secondary'; ?>">
                 <div class="card-body text-center">
-                    <h3><?php echo $pending; ?></h3>
+                    <h3><?php echo $pendingCount; ?></h3>
                     <p>Pending Sync</p>
                     <small>To be copied</small>
                 </div>
@@ -498,25 +576,55 @@ try {
 
     <!-- Sync Info -->
     <div class="alert alert-info">
-        <h5><i class="fas fa-info-circle"></i> Optimized Sync Features:</h5>
+        <h5><i class="fas fa-info-circle"></i> Rwanda Sync Features:</h5>
         <ul class="mb-0">
-            <li><strong>Dynamic column mapping</strong> - Automatically detects table structure</li>
+            <li><strong>No country filter</strong> - Source table contains only Rwanda companies</li>
+            <li><strong>Country enforcement</strong> - Forces country field to 'Rwanda' during sync</li>
+            <li><strong>Location cleanup</strong> - Updates state, location, city fields to Rwanda</li>
             <li><strong>Bulk operations</strong> - Processes in chunks of 100 records</li>
             <li><strong>Transaction support</strong> - Faster commits and rollback safety</li>
-            <li><strong>Auto-adds source_id column</strong> - Creates tracking column if missing</li>
             <li><strong>ON DUPLICATE KEY UPDATE</strong> - Single query for insert/update</li>
         </ul>
+    </div>
+
+    <!-- Database Info -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-database"></i> Database Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Source (JobSite):</h6>
+                    <table class="table table-sm">
+                        <tr><th>Database:</th><td><?php echo DB_JOBS_NAME; ?></td></tr>
+                        <tr><th>Table:</th><td><?php echo TABLE_JOBS_COMPANIES; ?></td></tr>
+                        <tr><th>Note:</th><td><span class="text-success">Only contains Rwanda companies</span></td></tr>
+                        <tr><th>Total Companies:</th><td><?php echo $jobCount; ?></td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Destination (TeamSite):</h6>
+                    <table class="table table-sm">
+                        <tr><th>Database:</th><td><?php echo DB_TEAM_NAME; ?></td></tr>
+                        <tr><th>Table:</th><td><?php echo TABLE_TEAM_COMPANIES; ?></td></tr>
+                        <tr><th>Country Enforcement:</th><td>All set to 'Rwanda'</td></tr>
+                        <tr><th>Rwanda Companies:</th><td><?php echo $teamCount; ?></td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Sync Button -->
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="fas fa-sync"></i> Sync Action</h5>
+            <h5 class="mb-0"><i class="fas fa-sync"></i> Rwanda Sync Action</h5>
         </div>
         <div class="card-body text-center">
-            <?php if ($pending > 0): ?>
-                <p class="lead">Ready to sync <?php echo $pending; ?> companies</p>
-                <p class="text-muted"><?php echo $jobCount; ?> total at Job site, <?php echo $syncedCount; ?> already synced</p>
+            <?php if ($pendingCount > 0): ?>
+                <p class="lead">Ready to sync <?php echo $pendingCount; ?> Rwanda companies</p>
+                <p class="text-muted"><?php echo $jobCount; ?> companies in source table, <?php echo $syncedCount; ?> already synced</p>
             <?php else: ?>
                 <p class="lead">All companies are already synced</p>
                 <p class="text-muted">You can still sync to update any changes</p>
@@ -525,26 +633,26 @@ try {
             <form method="POST" id="syncForm">
                 <input type="hidden" name="action" value="sync">
                 <button type="submit" class="btn btn-primary btn-lg" id="syncButton">
-                    <i class="fas fa-bolt"></i> Fast Sync All Companies
+                    <i class="fas fa-bolt"></i> Sync All Rwanda Companies
                 </button>
             </form>
             
             <div class="mt-3">
                 <small class="text-muted">
-                    <i class="fas fa-table"></i> 
-                    Automatically maps columns between databases
+                    <i class="fas fa-exclamation-circle"></i> 
+                    All companies will be set to country = 'Rwanda' during sync
                 </small>
             </div>
         </div>
     </div>
 
-    <!-- Sync Logs -->
+    <!-- Rwanda Sync Logs -->
     <div class="card mt-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-history"></i> Recent Sync Logs</h5>
+            <h5 class="mb-0"><i class="fas fa-history"></i> Rwanda Sync Logs</h5>
             <?php if (!empty($logs)): ?>
                 <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAllModal">
-                    <i class="fas fa-trash-alt"></i> Delete All Logs
+                    <i class="fas fa-trash-alt"></i> Delete All Rwanda Logs
                 </button>
             <?php endif; ?>
         </div>
@@ -552,7 +660,7 @@ try {
             <?php if (empty($logs)): ?>
                 <div class="text-center py-4">
                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                    <p>No sync logs yet. Perform your first sync to see logs here.</p>
+                    <p>No Rwanda sync logs yet. Perform your first Rwanda sync to see logs here.</p>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
@@ -560,6 +668,7 @@ try {
                         <thead>
                             <tr class="table-light">
                                 <th>Date & Time</th>
+                                <th>Country</th>
                                 <th>Total</th>
                                 <th>New</th>
                                 <th>Updated</th>
@@ -575,6 +684,7 @@ try {
                                         <strong><?php echo date('M j, Y', strtotime($log['sync_date'])); ?></strong><br>
                                         <small class="text-muted"><?php echo date('g:i A', strtotime($log['sync_date'])); ?></small>
                                     </td>
+                                    <td><span class="badge bg-primary"><?php echo $log['country'] ?? 'Rwanda'; ?></span></td>
                                     <td><span class="badge bg-secondary"><?php echo $log['total_companies']; ?></span></td>
                                     <td><span class="badge bg-success">+<?php echo $log['new_companies']; ?></span></td>
                                     <td><span class="badge bg-warning"><?php echo $log['updated_companies']; ?></span></td>
@@ -614,7 +724,7 @@ try {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Complete Sync Log</h5>
+                <h5 class="modal-title">Rwanda Company Sync Log Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -635,12 +745,12 @@ try {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Delete All Logs</h5>
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Delete All Rwanda Logs</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="lead">Are you sure you want to delete ALL sync logs?</p>
-                <p>This action will permanently delete <?php echo count($logs); ?> log entries.</p>
+                <p class="lead">Are you sure you want to delete ALL Rwanda sync logs?</p>
+                <p>This action will permanently delete <?php echo count($logs); ?> Rwanda log entries.</p>
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-circle"></i>
                     <strong>Warning:</strong> This action cannot be undone!
@@ -650,7 +760,7 @@ try {
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form method="POST" action="" style="display: inline;">
                     <input type="hidden" name="action" value="delete_all_logs">
-                    <button type="submit" class="btn btn-danger">Delete All Logs</button>
+                    <button type="submit" class="btn btn-danger">Delete All Rwanda Logs</button>
                 </form>
             </div>
         </div>
@@ -707,6 +817,8 @@ function viewLogDetails(logText) {
         if (line.includes('✓')) className = 'text-success fw-bold';
         else if (line.includes('✗')) className = 'text-danger fw-bold';
         else if (line.includes('===')) className = 'fw-bold border-top pt-2';
+        else if (line.includes('Rwanda')) className = 'fw-bold text-primary';
+        else if (line.includes('forced to country')) className = 'fw-bold text-success';
         
         const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         formattedLog += `<div class="${className}">${escapedLine}</div>`;
@@ -741,7 +853,7 @@ function copyLog() {
 
 // Delete confirmation function
 function confirmDeleteLog() {
-    return confirm('Are you sure you want to delete this log entry?\nThis action cannot be undone.');
+    return confirm('Are you sure you want to delete this Rwanda log entry?\nThis action cannot be undone.');
 }
 
 // Add loading animation to sync button
@@ -749,7 +861,7 @@ document.getElementById('syncForm').addEventListener('submit', function(e) {
     const btn = document.getElementById('syncButton');
     const originalText = btn.innerHTML;
     
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fast Syncing...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing Rwanda Companies...';
     btn.disabled = true;
     
     // Show progress alert
@@ -759,8 +871,8 @@ document.getElementById('syncForm').addEventListener('submit', function(e) {
         <div class="d-flex align-items-center">
             <div class="spinner-border spinner-border-sm me-2"></div>
             <div>
-                <strong>Fast sync in progress...</strong><br>
-                <small>Bulk processing <?php echo $jobCount; ?> companies. This will be much faster!</small>
+                <strong>Rwanda company sync in progress...</strong><br>
+                <small>Processing <?php echo $jobCount; ?> companies. Please wait...</small>
             </div>
         </div>
     `;
