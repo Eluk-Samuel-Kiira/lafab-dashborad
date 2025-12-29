@@ -3,12 +3,12 @@ require_once '../includes/config.php';
 require_once '../includes/database.php';
 
 // Debug: Show what environment and database is being used
-echo "<div style='background:#f0f0f0; padding:10px; margin:10px; border:1px solid #ccc;'>";
-echo "<h4>Environment Debug:</h4>";
-echo "<pre>";
-print_r(debugEnvironment());
-echo "</pre>";
-echo "</div>";
+// echo "<div style='background:#f0f0f0; padding:10px; margin:10px; border:1px solid #ccc;'>";
+// echo "<h4>Environment Debug:</h4>";
+// echo "<pre>";
+// print_r(debugEnvironment());
+// echo "</pre>";
+// echo "</div>";
 
 // Define that we're including this file
 define('INCLUDED', true);
