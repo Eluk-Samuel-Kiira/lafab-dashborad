@@ -587,30 +587,58 @@ try {
         </ul>
     </div>
 
-    <!-- Database Info -->
+    <!-- Database Info - Simplified Responsive -->
     <div class="card mb-4">
         <div class="card-header bg-secondary text-white">
             <h5 class="mb-0"><i class="fas fa-database"></i> Database Information</h5>
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-12 col-md-6 mb-4 mb-md-0">
                     <h6>Source (JobSite):</h6>
-                    <table class="table table-sm">
-                        <tr><th>Database:</th><td><?php echo DB_JOBS_NAME; ?></td></tr>
-                        <tr><th>Table:</th><td><?php echo TABLE_JOBS_COMPANIES; ?></td></tr>
-                        <tr><th>Note:</th><td><span class="text-success">Only contains Rwanda companies</span></td></tr>
-                        <tr><th>Total Companies:</th><td><?php echo $jobCount; ?></td></tr>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <th class="text-nowrap">Database:</th>
+                                <td class="text-break"><?php echo DB_JOBS_NAME; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Table:</th>
+                                <td class="text-break"><?php echo TABLE_JOBS_COMPANIES; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Note:</th>
+                                <td><span class="text-success">Only contains Rwanda companies</span></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Total Companies:</th>
+                                <td><?php echo $jobCount; ?></td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <h6>Destination (TeamSite):</h6>
-                    <table class="table table-sm">
-                        <tr><th>Database:</th><td><?php echo DB_TEAM_NAME; ?></td></tr>
-                        <tr><th>Table:</th><td><?php echo TABLE_TEAM_COMPANIES; ?></td></tr>
-                        <tr><th>Country Enforcement:</th><td>All set to 'Rwanda'</td></tr>
-                        <tr><th>Rwanda Companies:</th><td><?php echo $teamCount; ?></td></tr>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <th class="text-nowrap">Database:</th>
+                                <td class="text-break"><?php echo DB_TEAM_NAME; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Table:</th>
+                                <td class="text-break"><?php echo TABLE_TEAM_COMPANIES; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Country Enforcement:</th>
+                                <td>All set to 'Rwanda'</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Rwanda Companies:</th>
+                                <td><?php echo $teamCount; ?></td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
