@@ -84,7 +84,12 @@ foreach ($country_sync_items as $country => $sync_pages) {
 }
 ?>
 
-<div class="col-md-3 col-lg-2 bg-dark sidebar">
+<!-- Mobile Toggle Button -->
+<button class="mobile-sidebar-toggle d-md-none" id="mobileSidebarToggle">
+    <i class="fas fa-bars"></i>
+</button>
+
+<div class="col-md-3 col-lg-2 bg-dark sidebar" id="sidebar">
     <div class="sidebar-sticky pt-3">
         <!-- Logo in Sidebar -->
         <div class="text-center mb-4">
@@ -140,14 +145,115 @@ foreach ($country_sync_items as $country => $sync_pages) {
     </div>
 </div>
 
-<!-- Add Bootstrap and custom CSS for better dropdowns -->
+<!-- Mobile Overlay -->
+<div class="mobile-sidebar-overlay d-md-none" id="mobileOverlay"></div>
+
 <style>
+/* Desktop Sidebar */
 .sidebar {
     min-height: 100vh;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    z-index: 100;
+    z-index: 1000;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 250px;
+    transition: transform 0.3s ease;
 }
 
+/* Mobile Sidebar Toggle */
+.mobile-sidebar-toggle {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 9999;
+    background: #343a40;
+    color: white;
+    border: none;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+/* Mobile Overlay */
+.mobile-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    display: none;
+}
+
+/* Main content adjustment */
+main.col-md-9.col-lg-10 {
+    margin-left: 250px;
+}
+
+/* Mobile styles */
+@media (max-width: 767.98px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    .mobile-sidebar-overlay.show {
+        display: block;
+    }
+    
+    main.col-md-9.col-lg-10 {
+        margin-left: 0;
+        padding-top: 70px;
+    }
+    
+    /* Fix dropdown positioning on mobile */
+    .dropdown-menu {
+        position: absolute !important;
+        transform: translate3d(0px, 38px, 0px) !important;
+        top: 0;
+        left: 0;
+        will-change: transform;
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.1);
+    }
+    
+    /* Prevent dropdown from hiding sidebar */
+    .dropdown-menu.show {
+        display: block;
+        position: absolute;
+        z-index: 1001;
+    }
+    
+    /* Mobile dropdown items */
+    .dropdown-item {
+        padding: 12px 16px;
+        font-size: 16px; /* Larger touch targets */
+    }
+    
+    .dropdown-header {
+        padding: 12px 16px;
+    }
+}
+
+/* Tablet and above */
+@media (min-width: 768px) {
+    .mobile-sidebar-toggle,
+    .mobile-sidebar-overlay {
+        display: none !important;
+    }
+}
+
+/* Rest of your existing sidebar styles */
 .dropdown-menu {
     background-color: #343a40;
     border: 1px solid rgba(255,255,255,.1);
@@ -271,97 +377,178 @@ foreach ($country_sync_items as $country => $sync_pages) {
     padding: 0.2em 0.5em;
 }
 
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-    .sidebar {
-        min-height: auto;
-        position: fixed;
-        top: 0;
-        left: -100%;
-        width: 250px;
-        transition: left 0.3s;
-    }
-    
-    .sidebar.show {
-        left: 0;
+/* Click animation for nav items */
+.nav-link {
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.nav-link:active {
+    transform: scale(0.98);
+}
+
+/* Ensure dropdowns work properly on mobile */
+@media (max-width: 767.98px) {
+    .dropdown {
+        position: static;
     }
     
     .dropdown-menu {
-        position: static !important;
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: 100% !important;
+        width: 100% !important;
         transform: none !important;
-        width: 100%;
-        border: none;
-        box-shadow: none;
     }
 }
 </style>
 
-<!-- JavaScript to handle dropdown behavior -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Get the country sync dropdown
+    const sidebar = document.getElementById('sidebar');
+    const mobileToggle = document.getElementById('mobileSidebarToggle');
+    const mobileOverlay = document.getElementById('mobileOverlay');
     const countryDropdown = document.getElementById('countrySyncDropdown');
-    const countryDropdownMenu = countryDropdown.nextElementSibling;
+    const countryDropdownMenu = countryDropdown?.nextElementSibling;
     
-    // Prevent dropdown from closing when clicking inside
-    countryDropdownMenu.addEventListener('click', function(e) {
-        e.stopPropagation();
-    });
+    // Mobile sidebar toggle
+    if (mobileToggle) {
+        mobileToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            sidebar.classList.toggle('mobile-open');
+            mobileOverlay.classList.toggle('show');
+        });
+    }
     
-    // Toggle dropdown on click
-    countryDropdown.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const isExpanded = this.getAttribute('aria-expanded') === 'true';
-        this.setAttribute('aria-expanded', !isExpanded);
-        countryDropdownMenu.classList.toggle('show');
-    });
+    // Close sidebar when clicking overlay
+    if (mobileOverlay) {
+        mobileOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('mobile-open');
+            this.classList.remove('show');
+        });
+    }
     
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!countryDropdown.contains(e.target) && !countryDropdownMenu.contains(e.target)) {
-            countryDropdown.setAttribute('aria-expanded', 'false');
-            countryDropdownMenu.classList.remove('show');
-        }
-    });
-    
-    // Close dropdown on escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            countryDropdown.setAttribute('aria-expanded', 'false');
-            countryDropdownMenu.classList.remove('show');
-        }
-    });
-    
-    // Handle active states for dropdown items
-    const dropdownItems = countryDropdownMenu.querySelectorAll('.dropdown-item');
-    dropdownItems.forEach(item => {
-        item.addEventListener('click', function() {
-            // Remove active class from all items
-            dropdownItems.forEach(i => i.classList.remove('active'));
-            
-            // Add active class to clicked item
-            this.classList.add('active');
-            
-            // Update parent dropdown text to show selected country
-            const countryHeader = this.closest('li').querySelector('.dropdown-header');
-            if (countryHeader) {
-                const countryName = countryHeader.textContent.trim();
-                const countryBadge = document.createElement('span');
-                countryBadge.className = 'badge bg-info ms-1';
-                countryBadge.textContent = countryName;
-                
-                // Remove existing badge if any
-                const existingBadge = countryDropdown.querySelector('.badge');
-                if (existingBadge) {
-                    existingBadge.remove();
+    // Handle nav link clicks on mobile
+    const navLinks = document.querySelectorAll('.sidebar .nav-link:not(.dropdown-toggle)');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // If it's a regular nav link (not dropdown toggle)
+            if (!this.classList.contains('dropdown-toggle')) {
+                // On mobile, close sidebar after clicking
+                if (window.innerWidth < 768) {
+                    setTimeout(() => {
+                        sidebar.classList.remove('mobile-open');
+                        if (mobileOverlay) {
+                            mobileOverlay.classList.remove('show');
+                        }
+                    }, 100); // Small delay for better UX
                 }
-                
-                // Add new badge
-                countryDropdown.appendChild(countryBadge);
             }
         });
+    });
+    
+    // Handle dropdown item clicks on mobile
+    const dropdownItems = document.querySelectorAll('.dropdown-item');
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', function(e) {
+            // On mobile, close sidebar after clicking dropdown item
+            if (window.innerWidth < 768) {
+                setTimeout(() => {
+                    sidebar.classList.remove('mobile-open');
+                    if (mobileOverlay) {
+                        mobileOverlay.classList.remove('show');
+                    }
+                }, 100);
+            }
+        });
+    });
+    
+    // Handle country dropdown toggle
+    if (countryDropdown && countryDropdownMenu) {
+        countryDropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
+            countryDropdownMenu.classList.toggle('show');
+            
+            // On mobile, prevent sidebar from closing when dropdown is opened
+            if (window.innerWidth < 768) {
+                e.stopImmediatePropagation();
+            }
+        });
+        
+        // Close dropdown when clicking outside (desktop only)
+        if (window.innerWidth >= 768) {
+            document.addEventListener('click', function(e) {
+                if (!countryDropdown.contains(e.target) && !countryDropdownMenu.contains(e.target)) {
+                    countryDropdown.setAttribute('aria-expanded', 'false');
+                    countryDropdownMenu.classList.remove('show');
+                }
+            });
+        }
+        
+        // Close dropdown on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                countryDropdown.setAttribute('aria-expanded', 'false');
+                countryDropdownMenu.classList.remove('show');
+            }
+        });
+        
+        // Handle active states for dropdown items
+        const countryDropdownItems = countryDropdownMenu.querySelectorAll('.dropdown-item');
+        countryDropdownItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Remove active class from all items
+                countryDropdownItems.forEach(i => i.classList.remove('active'));
+                
+                // Add active class to clicked item
+                this.classList.add('active');
+                
+                // Update parent dropdown text to show selected country
+                const countryHeader = this.closest('li').querySelector('.dropdown-header');
+                if (countryHeader) {
+                    const countryName = countryHeader.textContent.trim();
+                    const countryBadge = document.createElement('span');
+                    countryBadge.className = 'badge bg-info ms-1';
+                    countryBadge.textContent = countryName;
+                    
+                    // Remove existing badge if any
+                    const existingBadge = countryDropdown.querySelector('.badge');
+                    if (existingBadge) {
+                        existingBadge.remove();
+                    }
+                    
+                    // Add new badge
+                    countryDropdown.appendChild(countryBadge);
+                }
+            });
+        });
+    }
+    
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth < 768 && 
+            !sidebar.contains(e.target) && 
+            !mobileToggle.contains(e.target) &&
+            sidebar.classList.contains('mobile-open')) {
+            sidebar.classList.remove('mobile-open');
+            if (mobileOverlay) {
+                mobileOverlay.classList.remove('show');
+            }
+        }
+    });
+    
+    // Close sidebar on window resize if going to desktop
+    window.addEventListener('resize', function() {
+        if (window.innerWidth >= 768) {
+            sidebar.classList.remove('mobile-open');
+            if (mobileOverlay) {
+                mobileOverlay.classList.remove('show');
+            }
+        }
     });
 });
 </script>
