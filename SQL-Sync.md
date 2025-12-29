@@ -177,7 +177,9 @@ ADD INDEX idx_last_sync (last_sync);
 
 
 Instructions
-1. when using it on teams run the above sql first on the diff sites and teams speific
-on the logs for the last_sync_id must be the latest id for that country on teams export table
+1. when using it on real server run the above sql first on the teams site and then diff job sites speific
+on the logs table for the last_sync_id must be the latest id for that country on teams export table to avoid exporting previous jobs already worked on
+icop0_js_job_jobs --> this changes depending on the country
+
 2. Also make sure the ids are changed to auto-increment for both team and job sites
  

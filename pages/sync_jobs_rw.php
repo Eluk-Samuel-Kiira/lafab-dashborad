@@ -1076,11 +1076,8 @@ try {
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2"><i class="fas fa-exchange-alt"></i> Rwanda Job Sync (Team → Rwanda JobSite)</h1>
         <div class="btn-group">
-            <button type="button" class="btn btn-outline-primary" onclick="window.location.href='dashboard.php'">
-                <i class="fas fa-tachometer-alt"></i> Dashboard
-            </button>
-            <button type="button" class="btn btn-outline-info" onclick="window.location.href='sync_companies.php'">
-                <i class="fas fa-building"></i> Sync Companies
+            <button type="button" class="btn btn-outline-info" onclick="window.location.href='sync_companies_rw.php'">
+                <i class="fas fa-building"></i> Sync Rw Companies
             </button>
         </div>
     </div>
