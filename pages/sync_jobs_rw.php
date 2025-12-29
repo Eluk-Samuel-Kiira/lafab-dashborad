@@ -1209,27 +1209,67 @@ try {
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-12 col-md-6 mb-4 mb-md-0">
                     <h6>Source Database (Team):</h6>
-                    <table class="table table-sm">
-                        <tr><th>Host:</th><td><?php echo DB_TEAM_HOST; ?></td></tr>
-                        <tr><th>Database:</th><td><?php echo DB_TEAM_NAME; ?></td></tr>
-                        <tr><th>Table:</th><td>pc0ww_JobsExport</td></tr>
-                        <tr><th>Filter:</th><td class="text-danger fw-bold">Country = 'Rwanda'</td></tr>
-                        <tr><th>Last Sync ID:</th><td class="fw-bold text-warning"><?php echo $lastSyncId; ?></td></tr>
-                        <tr><th>Pending Jobs:</th><td class="fw-bold">ID > <?php echo $lastSyncId; ?></td></tr>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <th class="text-nowrap">Host:</th>
+                                <td class="text-break"><?php echo DB_TEAM_HOST; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Database:</th>
+                                <td class="text-break"><?php echo DB_TEAM_NAME; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Table:</th>
+                                <td>pc0ww_JobsExport</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Filter:</th>
+                                <td class="text-danger fw-bold">Country = 'Rwanda'</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Last Sync ID:</th>
+                                <td class="fw-bold text-warning"><?php echo $lastSyncId; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Pending Jobs:</th>
+                                <td class="fw-bold">ID > <?php echo $lastSyncId; ?></td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <h6>Destination Database (Rwanda JobSite):</h6>
-                    <table class="table table-sm">
-                        <tr><th>Host:</th><td><?php echo DB_JOBS_HOST; ?></td></tr>
-                        <tr><th>Database:</th><td><?php echo DB_JOBS_NAME; ?></td></tr>
-                        <tr><th>Table:</th><td>icop0_js_job_jobs</td></tr>
-                        <tr><th>Sync Country:</th><td class="text-danger fw-bold">'rw'</td></tr>
-                        <tr><th>Sync Source:</th><td class="fw-bold">teamsite_export</td></tr>
-                        <tr><th>Tracking Fields:</th><td>source_id, sync_country, last_sync</td></tr>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <th class="text-nowrap">Host:</th>
+                                <td class="text-break"><?php echo DB_JOBS_HOST; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Database:</th>
+                                <td class="text-break"><?php echo DB_JOBS_NAME; ?></td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Table:</th>
+                                <td>icop0_js_job_jobs</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Sync Country:</th>
+                                <td class="text-danger fw-bold">'rw'</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Sync Source:</th>
+                                <td class="fw-bold">teamsite_export</td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Tracking Fields:</th>
+                                <td>source_id, sync_country, last_sync</td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
