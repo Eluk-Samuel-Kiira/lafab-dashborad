@@ -587,57 +587,60 @@ try {
         </ul>
     </div>
 
-    <!-- Database Info - Simplified Responsive -->
+    <!-- Database Info -->
     <div class="card mb-4">
         <div class="card-header bg-secondary text-white">
             <h5 class="mb-0"><i class="fas fa-database"></i> Database Information</h5>
         </div>
         <div class="card-body">
-            <div class="row">
-                <div class="col-12 col-md-6 mb-4 mb-md-0">
-                    <h6>Source (JobSite):</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <tr>
-                                <th class="text-nowrap">Database:</th>
-                                <td class="text-break"><?php echo DB_JOBS_NAME; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Table:</th>
-                                <td class="text-break"><?php echo TABLE_JOBS_COMPANIES; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Note:</th>
-                                <td><span class="text-success">Only contains Rwanda companies</span></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Total Companies:</th>
-                                <td><?php echo $jobCount; ?></td>
-                            </tr>
-                        </table>
+            <div class="db-container">
+                <!-- Source Database -->
+                <div class="db-card source-db">
+                    <div class="db-header">
+                        <h6><i class="fas fa-arrow-down"></i> Source (JobSite)</h6>
+                    </div>
+                    <div class="db-content">
+                        <div class="db-row">
+                            <span class="db-label">Database:</span>
+                            <span class="db-value"><?php echo DB_JOBS_NAME; ?></span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Table:</span>
+                            <span class="db-value"><?php echo TABLE_JOBS_COMPANIES; ?></span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Note:</span>
+                            <span class="db-value highlight">Only contains Rwanda companies</span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Total Companies:</span>
+                            <span class="db-value count"><?php echo $jobCount; ?></span>
+                        </div>
                     </div>
                 </div>
-                <div class="col-12 col-md-6">
-                    <h6>Destination (TeamSite):</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <tr>
-                                <th class="text-nowrap">Database:</th>
-                                <td class="text-break"><?php echo DB_TEAM_NAME; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Table:</th>
-                                <td class="text-break"><?php echo TABLE_TEAM_COMPANIES; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Country Enforcement:</th>
-                                <td>All set to 'Rwanda'</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Rwanda Companies:</th>
-                                <td><?php echo $teamCount; ?></td>
-                            </tr>
-                        </table>
+                
+                <!-- Destination Database -->
+                <div class="db-card destination-db">
+                    <div class="db-header">
+                        <h6><i class="fas fa-arrow-up"></i> Destination (TeamSite)</h6>
+                    </div>
+                    <div class="db-content">
+                        <div class="db-row">
+                            <span class="db-label">Database:</span>
+                            <span class="db-value"><?php echo DB_TEAM_NAME; ?></span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Table:</span>
+                            <span class="db-value"><?php echo TABLE_TEAM_COMPANIES; ?></span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Country Enforcement:</span>
+                            <span class="db-value">All set to 'Rwanda'</span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-label">Rwanda Companies:</span>
+                            <span class="db-value count"><?php echo $teamCount; ?></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -796,194 +799,363 @@ try {
 </div>
 
 <script>
-// Fix for view log button - using event delegation
-document.addEventListener('DOMContentLoaded', function() {
-    // Use event delegation for dynamically loaded content
-    document.body.addEventListener('click', function(e) {
-        if (e.target.closest('.view-log-btn')) {
-            const button = e.target.closest('.view-log-btn');
-            const logJson = button.getAttribute('data-log');
-            
-            try {
-                // Parse the JSON string
-                const logText = JSON.parse(logJson);
-                viewLogDetails(logText);
-            } catch (error) {
-                console.error('Error parsing log JSON:', error);
-                // Fallback: try to use the raw attribute (though it may be truncated)
-                viewLogDetails(button.getAttribute('data-log') || 'Error loading log');
-            }
-        }
-    });
-    
-    // Add event listener for delete buttons to show loading
-    document.querySelectorAll('.delete-log-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            if (confirmDeleteLog()) {
-                // Show loading on the button
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                btn.classList.add('disabled');
+    // Fix for view log button - using event delegation
+    document.addEventListener('DOMContentLoaded', function() {
+        // Use event delegation for dynamically loaded content
+        document.body.addEventListener('click', function(e) {
+            if (e.target.closest('.view-log-btn')) {
+                const button = e.target.closest('.view-log-btn');
+                const logJson = button.getAttribute('data-log');
                 
-                // The page will redirect after deletion
-            } else {
-                e.preventDefault();
+                try {
+                    // Parse the JSON string
+                    const logText = JSON.parse(logJson);
+                    viewLogDetails(logText);
+                } catch (error) {
+                    console.error('Error parsing log JSON:', error);
+                    // Fallback: try to use the raw attribute (though it may be truncated)
+                    viewLogDetails(button.getAttribute('data-log') || 'Error loading log');
+                }
             }
         });
-    });
-});
-
-function viewLogDetails(logText) {
-    const logElement = document.getElementById('logDetails');
-    
-    // Format the log with colors
-    let formattedLog = '';
-    const lines = logText.split('\n');
-    
-    lines.forEach(line => {
-        let className = '';
-        if (line.includes('✓')) className = 'text-success fw-bold';
-        else if (line.includes('✗')) className = 'text-danger fw-bold';
-        else if (line.includes('===')) className = 'fw-bold border-top pt-2';
-        else if (line.includes('Rwanda')) className = 'fw-bold text-primary';
-        else if (line.includes('forced to country')) className = 'fw-bold text-success';
         
-        const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        formattedLog += `<div class="${className}">${escapedLine}</div>`;
+        // Add event listener for delete buttons to show loading
+        document.querySelectorAll('.delete-log-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (confirmDeleteLog()) {
+                    // Show loading on the button
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+                    btn.classList.add('disabled');
+                    
+                    // The page will redirect after deletion
+                } else {
+                    e.preventDefault();
+                }
+            });
+        });
     });
-    
-    logElement.innerHTML = formattedLog;
-    
-    const modal = new bootstrap.Modal(document.getElementById('logModal'));
-    modal.show();
-}
 
-function copyLog() {
-    const logText = document.getElementById('logDetails').innerText;
-    navigator.clipboard.writeText(logText).then(() => {
-        // Show a subtle notification instead of alert
-        const copyBtn = document.querySelector('#logModal .btn-info');
-        const originalHtml = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        copyBtn.classList.remove('btn-info');
-        copyBtn.classList.add('btn-success');
+    function viewLogDetails(logText) {
+        const logElement = document.getElementById('logDetails');
         
-        setTimeout(() => {
-            copyBtn.innerHTML = originalHtml;
-            copyBtn.classList.remove('btn-success');
-            copyBtn.classList.add('btn-info');
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        alert('Failed to copy log to clipboard');
-    });
-}
+        // Format the log with colors
+        let formattedLog = '';
+        const lines = logText.split('\n');
+        
+        lines.forEach(line => {
+            let className = '';
+            if (line.includes('✓')) className = 'text-success fw-bold';
+            else if (line.includes('✗')) className = 'text-danger fw-bold';
+            else if (line.includes('===')) className = 'fw-bold border-top pt-2';
+            else if (line.includes('Rwanda')) className = 'fw-bold text-primary';
+            else if (line.includes('forced to country')) className = 'fw-bold text-success';
+            
+            const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            formattedLog += `<div class="${className}">${escapedLine}</div>`;
+        });
+        
+        logElement.innerHTML = formattedLog;
+        
+        const modal = new bootstrap.Modal(document.getElementById('logModal'));
+        modal.show();
+    }
 
-// Delete confirmation function
-function confirmDeleteLog() {
-    return confirm('Are you sure you want to delete this Rwanda log entry?\nThis action cannot be undone.');
-}
+    function copyLog() {
+        const logText = document.getElementById('logDetails').innerText;
+        navigator.clipboard.writeText(logText).then(() => {
+            // Show a subtle notification instead of alert
+            const copyBtn = document.querySelector('#logModal .btn-info');
+            const originalHtml = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            copyBtn.classList.remove('btn-info');
+            copyBtn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-info');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            alert('Failed to copy log to clipboard');
+        });
+    }
 
-// Add loading animation to sync button
-document.getElementById('syncForm').addEventListener('submit', function(e) {
-    const btn = document.getElementById('syncButton');
-    const originalText = btn.innerHTML;
-    
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing Rwanda Companies...';
-    btn.disabled = true;
-    
-    // Show progress alert
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-info mt-3';
-    alertDiv.innerHTML = `
-        <div class="d-flex align-items-center">
-            <div class="spinner-border spinner-border-sm me-2"></div>
-            <div>
-                <strong>Rwanda company sync in progress...</strong><br>
-                <small>Processing <?php echo $jobCount; ?> companies. Please wait...</small>
+    // Delete confirmation function
+    function confirmDeleteLog() {
+        return confirm('Are you sure you want to delete this Rwanda log entry?\nThis action cannot be undone.');
+    }
+
+    // Add loading animation to sync button
+    document.getElementById('syncForm').addEventListener('submit', function(e) {
+        const btn = document.getElementById('syncButton');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing Rwanda Companies...';
+        btn.disabled = true;
+        
+        // Show progress alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-info mt-3';
+        alertDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                <div>
+                    <strong>Rwanda company sync in progress...</strong><br>
+                    <small>Processing <?php echo $jobCount; ?> companies. Please wait...</small>
+                </div>
             </div>
-        </div>
-    `;
-    
-    this.appendChild(alertDiv);
-    
-    // Re-enable button after 60 seconds (in case of error)
-    setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        alertDiv.remove();
-    }, 60000);
-});
-
-// Auto-dismiss alerts after 5 seconds
-setTimeout(() => {
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        const bsAlert = new bootstrap.Alert(alert);
+        `;
+        
+        this.appendChild(alertDiv);
+        
+        // Re-enable button after 60 seconds (in case of error)
         setTimeout(() => {
-            bsAlert.close();
-        }, 5000);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            alertDiv.remove();
+        }, 60000);
     });
-}, 5000);
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            setTimeout(() => {
+                bsAlert.close();
+            }, 5000);
+        });
+    }, 5000);
 </script>
 
+
+
 <style>
-.card {
-    border-radius: 8px;
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    /* Database Info Custom Styling */
+    .db-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .db-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    .db-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .source-db {
+        border-left: 4px solid #3498db;
+        animation-delay: 0.1s;
+    }
+    
+    .destination-db {
+        border-left: 4px solid #2ecc71;
+        animation-delay: 0.2s;
+    }
+    
+    .db-header {
+        background: #2c3e50;
+        padding: 0.75rem 1rem;
+        color: white;
+    }
+    
+    .source-db .db-header {
+        background: #2980b9;
+    }
+    
+    .destination-db .db-header {
+        background: #27ae60;
+    }
+    
+    .db-header h6 {
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .db-header i {
+        font-size: 0.9em;
+    }
+    
+    .db-content {
+        padding: 1rem;
+    }
+    
+    .db-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .db-row:last-child {
+        border-bottom: none;
+    }
+    
+    .db-label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.9em;
+    }
+    
+    .db-value {
+        color: #6c757d;
+        word-break: break-word;
+    }
+    
+    .highlight {
+        color: #27ae60;
+        font-weight: 500;
+    }
+    
+    .count {
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #2c3e50;
+    }
+    
+    /* Animation */
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Desktop View - Side by Side */
+    @media (min-width: 768px) {
+        .db-container {
+            flex-direction: row;
+            justify-content: space-between;
+        }
+        
+        .db-card {
+            flex: 1;
+            margin: 0 0.75rem;
+        }
+        
+        .db-card:first-child {
+            margin-left: 0;
+        }
+        
+        .db-card:last-child {
+            margin-right: 0;
+        }
+        
+        .db-row {
+            grid-template-columns: 140px 1fr;
+        }
+    }
+    
+    /* Mobile View - Stacked */
+    @media (max-width: 767px) {
+        .db-row {
+            grid-template-columns: 1fr;
+            gap: 0.25rem;
+        }
+        
+        .db-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .db-value {
+            font-size: 0.95em;
+        }
+    }
+    
+    /* Small Mobile */
+    @media (max-width: 480px) {
+        .db-header {
+            padding: 0.5rem 0.75rem;
+        }
+        
+        .db-content {
+            padding: 0.75rem;
+        }
+        
+        .db-row {
+            padding: 0.5rem 0;
+        }
+    }
+</style>
 
-.card-header {
-    border-radius: 8px 8px 0 0 !important;
-}
+<style>
+        
+    .card {
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
-.badge {
-    font-size: 0.85em;
-    padding: 0.35em 0.65em;
-}
+    .card-header {
+        border-radius: 8px 8px 0 0 !important;
+    }
 
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    transform: translateX(2px);
-    transition: all 0.2s ease;
-}
+    .badge {
+        font-size: 0.85em;
+        padding: 0.35em 0.65em;
+    }
 
-pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+        transform: translateX(2px);
+        transition: all 0.2s ease;
+    }
 
-.btn-lg {
-    padding: 12px 30px;
-    font-size: 1.1rem;
-}
+    pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
 
-.alert-info {
-    background-color: #e8f4fd;
-    border-color: #b6e0fe;
-    color: #0c5460;
-}
+    .btn-lg {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+    }
 
-.btn-group-sm .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
+    .alert-info {
+        background-color: #e8f4fd;
+        border-color: #b6e0fe;
+        color: #0c5460;
+    }
 
-.delete-log-btn:hover {
-    background-color: #dc3545;
-    color: white !important;
-}
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
 
-/* Animation for delete button */
-@keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
+    .delete-log-btn:hover {
+        background-color: #dc3545;
+        color: white !important;
+    }
 
-.fade-out {
-    animation: fadeOut 0.5s ease-out;
-}
+    /* Animation for delete button */
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+
+    .fade-out {
+        animation: fadeOut 0.5s ease-out;
+    }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

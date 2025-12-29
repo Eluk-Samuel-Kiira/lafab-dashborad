@@ -1208,72 +1208,76 @@ try {
             <h5 class="mb-0"><i class="fas fa-database"></i> Database Information (Rwanda)</h5>
         </div>
         <div class="card-body">
-            <div class="row">
-                <div class="col-12 col-md-6 mb-4 mb-md-0">
-                    <h6>Source Database (Team):</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <tr>
-                                <th class="text-nowrap">Host:</th>
-                                <td class="text-break"><?php echo DB_TEAM_HOST; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Database:</th>
-                                <td class="text-break"><?php echo DB_TEAM_NAME; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Table:</th>
-                                <td>pc0ww_JobsExport</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Filter:</th>
-                                <td class="text-danger fw-bold">Country = 'Rwanda'</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Last Sync ID:</th>
-                                <td class="fw-bold text-warning"><?php echo $lastSyncId; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Pending Jobs:</th>
-                                <td class="fw-bold">ID > <?php echo $lastSyncId; ?></td>
-                            </tr>
-                        </table>
+            <div class="sync-container">
+                <!-- Source Database -->
+                <div class="sync-card source-sync">
+                    <div class="sync-header">
+                        <h6><i class="fas fa-database"></i> Source Database (Team)</h6>
+                    </div>
+                    <div class="sync-content">
+                        <div class="sync-row">
+                            <span class="sync-label">Host:</span>
+                            <span class="sync-value code"><?php echo DB_TEAM_HOST; ?></span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Database:</span>
+                            <span class="sync-value"><?php echo DB_TEAM_NAME; ?></span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Table:</span>
+                            <span class="sync-value">pc0ww_JobsExport</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Filter:</span>
+                            <span class="sync-value filter">Country = 'Rwanda'</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Last Sync ID:</span>
+                            <span class="sync-value highlight"><?php echo $lastSyncId; ?></span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Pending Jobs:</span>
+                            <span class="sync-value pending">ID > <?php echo $lastSyncId; ?></span>
+                        </div>
                     </div>
                 </div>
-                <div class="col-12 col-md-6">
-                    <h6>Destination Database (Rwanda JobSite):</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <tr>
-                                <th class="text-nowrap">Host:</th>
-                                <td class="text-break"><?php echo DB_JOBS_HOST; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Database:</th>
-                                <td class="text-break"><?php echo DB_JOBS_NAME; ?></td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Table:</th>
-                                <td>icop0_js_job_jobs</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Sync Country:</th>
-                                <td class="text-danger fw-bold">'rw'</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Sync Source:</th>
-                                <td class="fw-bold">teamsite_export</td>
-                            </tr>
-                            <tr>
-                                <th class="text-nowrap">Tracking Fields:</th>
-                                <td>source_id, sync_country, last_sync</td>
-                            </tr>
-                        </table>
+                
+                <!-- Destination Database -->
+                <div class="sync-card destination-sync">
+                    <div class="sync-header">
+                        <h6><i class="fas fa-cloud-upload-alt"></i> Destination Database (Rwanda JobSite)</h6>
+                    </div>
+                    <div class="sync-content">
+                        <div class="sync-row">
+                            <span class="sync-label">Host:</span>
+                            <span class="sync-value code"><?php echo DB_JOBS_HOST; ?></span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Database:</span>
+                            <span class="sync-value"><?php echo DB_JOBS_NAME; ?></span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Table:</span>
+                            <span class="sync-value">icop0_js_job_jobs</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Sync Country:</span>
+                            <span class="sync-value filter">'rw'</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Sync Source:</span>
+                            <span class="sync-value source">teamsite_export</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Tracking Fields:</span>
+                            <span class="sync-value">source_id, sync_country, last_sync</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
 
     <!-- Sync Query Info -->
     <div class="card mb-4">
@@ -1470,199 +1474,200 @@ try {
 </div>
 
 <script>
-// Fix for view log button - using event delegation
-document.addEventListener('DOMContentLoaded', function() {
-    // Clear URL parameters
-    if (window.location.search.includes('message=') || window.location.search.includes('t=')) {
-        const url = new URL(window.location);
-        url.searchParams.delete('message');
-        url.searchParams.delete('t');
-        window.history.replaceState({}, document.title, url.toString());
-    }
-    
-    // Use event delegation for dynamically loaded content
-    document.body.addEventListener('click', function(e) {
-        if (e.target.closest('.view-log-btn')) {
-            const button = e.target.closest('.view-log-btn');
-            const logJson = button.getAttribute('data-log');
-            
-            try {
-                const logText = JSON.parse(logJson);
-                viewLogDetails(logText);
-            } catch (error) {
-                console.error('Error parsing log JSON:', error);
-                viewLogDetails(button.getAttribute('data-log') || 'Error loading log');
-            }
+    // Fix for view log button - using event delegation
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clear URL parameters
+        if (window.location.search.includes('message=') || window.location.search.includes('t=')) {
+            const url = new URL(window.location);
+            url.searchParams.delete('message');
+            url.searchParams.delete('t');
+            window.history.replaceState({}, document.title, url.toString());
         }
-    });
-    
-    // Add event listener for delete buttons
-    document.querySelectorAll('.delete-log-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            if (confirmDeleteLog()) {
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                btn.classList.add('disabled');
-            } else {
-                e.preventDefault();
+        
+        // Use event delegation for dynamically loaded content
+        document.body.addEventListener('click', function(e) {
+            if (e.target.closest('.view-log-btn')) {
+                const button = e.target.closest('.view-log-btn');
+                const logJson = button.getAttribute('data-log');
+                
+                try {
+                    const logText = JSON.parse(logJson);
+                    viewLogDetails(logText);
+                } catch (error) {
+                    console.error('Error parsing log JSON:', error);
+                    viewLogDetails(button.getAttribute('data-log') || 'Error loading log');
+                }
             }
         });
-    });
-});
-
-function viewLogDetails(logText) {
-    const logElement = document.getElementById('logDetails');
-    
-    let formattedLog = '';
-    const lines = logText.split('\n');
-    
-    lines.forEach(line => {
-        let className = '';
-        if (line.includes('✓')) className = 'text-success fw-bold';
-        else if (line.includes('✗')) className = 'text-danger fw-bold';
-        else if (line.includes('===')) className = 'fw-bold border-top pt-2';
-        else if (line.includes('Rwanda')) className = 'text-primary fw-bold';
-        else if (line.includes('Last sync ID')) className = 'text-warning fw-bold';
-        else if (line.includes('Default Company ID') || line.includes('Default User ID')) className = 'text-info fw-bold';
         
-        const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        formattedLog += `<div class="${className}">${escapedLine}</div>`;
+        // Add event listener for delete buttons
+        document.querySelectorAll('.delete-log-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (confirmDeleteLog()) {
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+                    btn.classList.add('disabled');
+                } else {
+                    e.preventDefault();
+                }
+            });
+        });
     });
-    
-    logElement.innerHTML = formattedLog;
-    
-    const modal = new bootstrap.Modal(document.getElementById('logModal'));
-    modal.show();
-}
 
-function copyLog() {
-    const logText = document.getElementById('logDetails').innerText;
-    navigator.clipboard.writeText(logText).then(() => {
-        const copyBtn = document.querySelector('#logModal .btn-info');
-        const originalHtml = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        copyBtn.classList.remove('btn-info');
-        copyBtn.classList.add('btn-success');
+    function viewLogDetails(logText) {
+        const logElement = document.getElementById('logDetails');
         
-        setTimeout(() => {
-            copyBtn.innerHTML = originalHtml;
-            copyBtn.classList.remove('btn-success');
-            copyBtn.classList.add('btn-info');
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        alert('Failed to copy log to clipboard');
-    });
-}
+        let formattedLog = '';
+        const lines = logText.split('\n');
+        
+        lines.forEach(line => {
+            let className = '';
+            if (line.includes('✓')) className = 'text-success fw-bold';
+            else if (line.includes('✗')) className = 'text-danger fw-bold';
+            else if (line.includes('===')) className = 'fw-bold border-top pt-2';
+            else if (line.includes('Rwanda')) className = 'text-primary fw-bold';
+            else if (line.includes('Last sync ID')) className = 'text-warning fw-bold';
+            else if (line.includes('Default Company ID') || line.includes('Default User ID')) className = 'text-info fw-bold';
+            
+            const escapedLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            formattedLog += `<div class="${className}">${escapedLine}</div>`;
+        });
+        
+        logElement.innerHTML = formattedLog;
+        
+        const modal = new bootstrap.Modal(document.getElementById('logModal'));
+        modal.show();
+    }
 
-function confirmDeleteLog() {
-    return confirm('Are you sure you want to delete this Rwanda log entry?\nThis action cannot be undone.');
-}
+    function copyLog() {
+        const logText = document.getElementById('logDetails').innerText;
+        navigator.clipboard.writeText(logText).then(() => {
+            const copyBtn = document.querySelector('#logModal .btn-info');
+            const originalHtml = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            copyBtn.classList.remove('btn-info');
+            copyBtn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-info');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            alert('Failed to copy log to clipboard');
+        });
+    }
 
-// Add loading animation to sync button
-document.getElementById('syncForm').addEventListener('submit', function(e) {
-    const btn = document.getElementById('syncButton');
-    const originalText = btn.innerHTML;
-    
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing Rwanda Jobs...';
-    btn.disabled = true;
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-info mt-3';
-    alertDiv.innerHTML = `
-        <div class="d-flex align-items-center">
-            <div class="spinner-border spinner-border-sm me-2"></div>
-            <div>
-                <strong>Rwanda job sync in progress...</strong><br>
-                <small>Syncing jobs with ID > <?php echo $lastSyncId; ?> (<?php echo $pendingSync; ?> pending jobs). Please wait...</small>
-                <div class="progress mt-2" style="height: 5px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+    function confirmDeleteLog() {
+        return confirm('Are you sure you want to delete this Rwanda log entry?\nThis action cannot be undone.');
+    }
+
+    // Add loading animation to sync button
+    document.getElementById('syncForm').addEventListener('submit', function(e) {
+        const btn = document.getElementById('syncButton');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing Rwanda Jobs...';
+        btn.disabled = true;
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-info mt-3';
+        alertDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                <div>
+                    <strong>Rwanda job sync in progress...</strong><br>
+                    <small>Syncing jobs with ID > <?php echo $lastSyncId; ?> (<?php echo $pendingSync; ?> pending jobs). Please wait...</small>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
-    
-    this.appendChild(alertDiv);
-});
-
-// Auto-dismiss alerts after 5 seconds
-setTimeout(() => {
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        const bsAlert = new bootstrap.Alert(alert);
-        setTimeout(() => {
-            bsAlert.close();
-        }, 5000);
+        `;
+        
+        this.appendChild(alertDiv);
     });
-}, 5000);
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            setTimeout(() => {
+                bsAlert.close();
+            }, 5000);
+        });
+    }, 5000);
 </script>
 
 <style>
-.card {
-    border-radius: 8px;
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
-.card-header {
-    border-radius: 8px 8px 0 0 !important;
-}
+    .card {
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
-.badge {
-    font-size: 0.85em;
-    padding: 0.35em 0.65em;
-}
+    .card-header {
+        border-radius: 8px 8px 0 0 !important;
+    }
 
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    transform: translateX(2px);
-    transition: all 0.2s ease;
-}
+    .badge {
+        font-size: 0.85em;
+        padding: 0.35em 0.65em;
+    }
 
-pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+        transform: translateX(2px);
+        transition: all 0.2s ease;
+    }
 
-.btn-lg {
-    padding: 12px 30px;
-    font-size: 1.1rem;
-}
+    pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
 
-.alert-info {
-    background-color: #e8f4fd;
-    border-color: #b6e0fe;
-    color: #0c5460;
-}
+    .btn-lg {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+    }
 
-.btn-group-sm .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
+    .alert-info {
+        background-color: #e8f4fd;
+        border-color: #b6e0fe;
+        color: #0c5460;
+    }
 
-.delete-log-btn:hover {
-    background-color: #dc3545;
-    color: white !important;
-}
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
 
-code {
-    background-color: #f8f9fa;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-}
+    .delete-log-btn:hover {
+        background-color: #dc3545;
+        color: white !important;
+    }
 
-.text-danger {
-    color: #dc3545 !important;
-}
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+    }
 
-.fa-flag-rw {
-    color: #00a1de;
-    background: linear-gradient(90deg, #00a1de 33%, #fad201 33%, #fad201 66%, #007a30 66%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    .fa-flag-rw {
+        color: #00a1de;
+        background: linear-gradient(90deg, #00a1de 33%, #fad201 33%, #fad201 66%, #007a30 66%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
