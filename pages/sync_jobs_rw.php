@@ -22,6 +22,7 @@ define('SMALL_CHUNK_SIZE_FETCH', 100);   // Small fetch size
 // Default values for Rwanda
 define('DEFAULT_COMPANY_ID', 4171);  // Default company ID for Rwanda
 define('DEFAULT_USER_ID', 13206);    // Default user ID for Rwanda
+define('DEFAULT_COMPANY', 'Not Set Yet');    // Default user ID for Rwanda
 
 // Handle delete log action
 if (isset($_GET['action']) && $_GET['action'] === 'delete_log' && isset($_GET['id'])) {
@@ -91,13 +92,14 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete_all_logs') {
 require_once '../includes/header.php';
 require_once '../includes/sidebar.php';
 
-// Function to create logs table if not exists (country-specific)
+
+// Function to create logs table if not exists (country-specific) and insert first row
 function createJobSyncLogsTable($teamDb) {
     $sql = "CREATE TABLE IF NOT EXISTS " . TABLE_JOB_SYNC_LOGS_COUNTRY . " (
         id INT AUTO_INCREMENT PRIMARY KEY,
         sync_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         country VARCHAR(10) DEFAULT '" . CURRENT_COUNTRY . "',
-        last_sync_id INT DEFAULT 3721,  -- Last team ID that was synced
+        last_sync_id INT DEFAULT 4140,  -- Last team ID that was synced
         total_jobs INT DEFAULT 0,
         new_jobs INT DEFAULT 0,
         updated_jobs INT DEFAULT 0,
@@ -109,7 +111,41 @@ function createJobSyncLogsTable($teamDb) {
         INDEX idx_last_sync_id (last_sync_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=" . DB_CHARSET;
     
-    return $teamDb->query($sql);
+    // Create the table
+    $teamDb->query($sql);
+    
+    // Check if table is empty (just created) and insert first row
+    $check_sql = "SELECT COUNT(*) as row_count FROM " . TABLE_JOB_SYNC_LOGS_COUNTRY;
+    $check_result = $teamDb->query($check_sql);
+    
+    if ($check_result) {
+        $row = $check_result->fetch_assoc();
+        if ($row['row_count'] == 0) {
+            // Insert first row with initial data
+            $initial_log_text = "=== RWANDA JOB SYNC LOGS TABLE CREATED ===\n";
+            $initial_log_text .= "Date: " . date('Y-m-d H:i:s') . "\n";
+            $initial_log_text .= "Country: " . CURRENT_COUNTRY . "\n";
+            $initial_log_text .= "Initial last_sync_id: 4140\n";
+            $initial_log_text .= "Table ready for sync operations";
+            
+            $insert_sql = "INSERT INTO " . TABLE_JOB_SYNC_LOGS_COUNTRY . " 
+                          (country, last_sync_id, total_jobs, new_jobs, updated_jobs, errors, processing_time, log_details) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            
+            $teamDb->preparedQuery($insert_sql, [
+                CURRENT_COUNTRY,
+                4140, // Always put the last id for that country posted on the team site here
+                0,
+                0,
+                0,
+                0,
+                0.00,
+                $initial_log_text
+            ]);
+        }
+    }
+    
+    return true;
 }
 
 // Helper function to get table columns
@@ -120,6 +156,23 @@ function getTableColumns($db, $tableName) {
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $columns[] = $row['Field'];
+        }
+    }
+    
+    return $columns;
+}
+
+// Helper function to get table columns EXCLUDING id for insert
+function getTableColumnsForInsert($db, $tableName) {
+    $columns = [];
+    $result = $db->query("SHOW COLUMNS FROM $tableName");
+    
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            // Skip the auto-increment id column
+            if ($row['Field'] !== 'id') {
+                $columns[] = $row['Field'];
+            }
         }
     }
     
@@ -145,7 +198,7 @@ function getJobFieldMapping() {
         'qualifications' => 'qualifications',
         'prefferdskills' => 'prefferdskills',
         'applyinfo' => 'applyinfo',
-        'company' => 'company',
+        'Company' => 'company',
         'country' => 'country',
         'state' => 'state',
         'county' => 'county',
@@ -265,12 +318,12 @@ function mapTeamJobToJobs($teamJob, $fieldMapping) {
     
     // Copy team's ID to job site's job_id field for tracking
     if (!empty($teamJob['id'])) {
-        $mappedData['job_id'] = (int)$teamJob['id'];
+        $mappedData['job_id'] = (int)$teamJob['id']; // Store team's id in job_id column
     }
     
     // Also copy team's ID to source_id for tracking
     if (!empty($teamJob['id'])) {
-        $mappedData['source_id'] = (int)$teamJob['id'];
+        $mappedData['source_id'] = (int)$teamJob['id']; // Store team's id in source_id column
     }
     
     return $mappedData;
@@ -280,6 +333,9 @@ function getDefaultValueForField($field) {
     $defaults = [
         'uid' => DEFAULT_USER_ID,
         'companyid' => DEFAULT_COMPANY_ID,
+        'company' => DEFAULT_COMPANY,
+        'reference' => '',
+        'duration' => '',
         'created_by' => 0,
         'modified_by' => 0,
         'hits' => 0,
@@ -290,6 +346,7 @@ function getDefaultValueForField($field) {
     
     return $defaults[$field] ?? null;
 }
+
 
 // Optimized bulk insert jobs function with duplicate checking
 function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
@@ -352,8 +409,17 @@ function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
             $rowValues = [];
             
             foreach ($jobsColumns as $column) {
+                // =========== KEY FIX HERE ===========
+                // SKIP the 'id' column - let MySQL auto-increment it
+                if ($column === 'id') {
+                    continue; // Skip this column entirely for INSERT
+                }
+                // ====================================
+                
                 if ($column === 'source_id') {
                     $rowValues[] = (int)$job['id']; // Use team job ID as source
+                } elseif ($column === 'job_id') {
+                    $rowValues[] = (int)$job['id']; // Use team job ID as job_id
                 } elseif ($column === 'last_sync') {
                     $rowValues[] = $jobsDb->escape($now);
                 } elseif ($column === 'sync_source') {
@@ -376,7 +442,15 @@ function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
         
         if (empty($values)) continue;
         
-        $sql = "INSERT INTO " . TABLE_JOBS_JOBS . " (" . implode(', ', $jobsColumns) . ") 
+        // We need to build the column list excluding 'id'
+        $insertColumns = [];
+        foreach ($jobsColumns as $column) {
+            if ($column !== 'id') {
+                $insertColumns[] = $column;
+            }
+        }
+        
+        $sql = "INSERT INTO " . TABLE_JOBS_JOBS . " (" . implode(', ', $insertColumns) . ") 
                 VALUES " . implode(', ', $values);
         
         try {
@@ -399,7 +473,13 @@ function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
                     try {
                         $individualValues = [];
                         foreach ($jobsColumns as $column) {
+                            if ($column === 'id') {
+                                continue; // Skip id column
+                            }
+                            
                             if ($column === 'source_id') {
+                                $individualValues[] = (int)$job['id'];
+                            } elseif ($column === 'job_id') {
                                 $individualValues[] = (int)$job['id'];
                             } elseif ($column === 'last_sync') {
                                 $individualValues[] = $jobsDb->escape($now);
@@ -414,7 +494,7 @@ function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
                             }
                         }
                         
-                        $individualSql = "INSERT IGNORE INTO " . TABLE_JOBS_JOBS . " (" . implode(', ', $jobsColumns) . ") 
+                        $individualSql = "INSERT IGNORE INTO " . TABLE_JOBS_JOBS . " (" . implode(', ', $insertColumns) . ") 
                                          VALUES (" . implode(', ', $individualValues) . ")";
                         
                         $jobsDb->query($individualSql);
@@ -448,6 +528,8 @@ function bulkInsertJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
     
     return $inserted;
 }
+
+
 
 // Optimized bulk update jobs function with duplicate checking
 function bulkUpdateJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
@@ -511,8 +593,13 @@ function bulkUpdateJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
             $rowValues = [];
             
             foreach ($jobsColumns as $column) {
+                // For updates, we NEED to include the 'id' column to match existing records
                 if ($column === 'id') {
-                    $rowValues[] = (int)$job['jobs_id']; // Jobs table ID
+                    $rowValues[] = (int)$job['jobs_id']; // Jobs table ID (from auto-increment)
+                } elseif ($column === 'job_id') {
+                    $rowValues[] = (int)$job['id']; // Team's ID stored in job_id column
+                } elseif ($column === 'source_id') {
+                    $rowValues[] = (int)$job['id']; // Team's ID stored in source_id column
                 } elseif ($column === 'last_sync') {
                     $rowValues[] = $jobsDb->escape($now);
                 } elseif ($column === 'sync_source') {
@@ -538,7 +625,9 @@ function bulkUpdateJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
         
         $updates = [];
         foreach ($jobsColumns as $column) {
-            if ($column !== 'id' && $column !== 'source_id' && $column !== 'sync_source' && $column !== 'sync_country') {
+            // Don't update the id, source_id, job_id columns on duplicate
+            if ($column !== 'id' && $column !== 'source_id' && $column !== 'job_id' && 
+                $column !== 'sync_source' && $column !== 'sync_country') {
                 $updates[] = "$column = VALUES($column)";
             }
         }
@@ -577,6 +666,8 @@ function bulkUpdateJobs($jobsDb, $jobs, $jobsColumns, &$log_details) {
     
     return $updated;
 }
+
+
 
 // Update team table sync status
 function updateTeamSyncStatus($teamDb, $teamJobId, $status, $error = null) {
@@ -660,6 +751,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync_jobs_rw') {
         
         $sql = "SELECT * FROM " . TABLE_TEAM_JOBS_EXPORT . " 
                 WHERE Country = 'Rwanda'
+                AND (sync_status = 'pending' OR sync_status IS NULL)
                 AND id > $last_sync_id
                 ORDER BY id ASC
                 LIMIT 500";  // Process in batches of 500

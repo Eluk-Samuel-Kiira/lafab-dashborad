@@ -123,9 +123,7 @@ ALTER TABLE pc0ww_JobsExport ADD COLUMN serverstatus VARCHAR(255) CHARACTER SET 
 ALTER TABLE pc0ww_JobsExport ADD COLUMN serverid INT(11) DEFAULT 0;
 ALTER TABLE pc0ww_JobsExport ADD COLUMN joblink VARCHAR(400) CHARACTER SET utf8 COLLATE utf8_general_ci NULL;
 
--- 14. Copy data from existing columns to new columns where applicable
--- Note: 'Company' (with capital C) exists, we need to copy to 'company' (lowercase)
-UPDATE pc0ww_JobsExport SET company = Company WHERE Company IS NOT NULL;
+
 
 -- Copy city data (if exists in some other field, adjust as needed)
 -- UPDATE pc0ww_JobsExport SET city = [existing_city_field] WHERE [existing_city_field] IS NOT NULL;
@@ -133,6 +131,9 @@ UPDATE pc0ww_JobsExport SET company = Company WHERE Company IS NOT NULL;
 -- Copy departmentid/shift if they exist somewhere
 -- UPDATE pc0ww_JobsExport SET departmentid = [existing_department_field];
 -- UPDATE pc0ww_JobsExport SET shift = [existing_shift_field];
+
+
+
 
 
 
@@ -169,25 +170,6 @@ ADD INDEX idx_last_sync (last_sync);
 
 
 
--- ============================================
--- CREATE SYNC LOGS TABLE ON TEAMS SITE
--- ============================================
-
-CREATE TABLE IF NOT EXISTS pc0ww_job_sync_logs_rw (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sync_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    country VARCHAR(10) NOT NULL,
-    last_sync_id INT DEFAULT 0,  -- Last team ID that was synced
-    total_jobs INT DEFAULT 0,
-    new_jobs INT DEFAULT 0,
-    updated_jobs INT DEFAULT 0,
-    errors INT DEFAULT 0,
-    processing_time DECIMAL(5,2) DEFAULT 0,
-    log_details TEXT,
-    INDEX idx_sync_date (sync_date),
-    INDEX idx_country (country),
-    INDEX idx_last_sync_id (last_sync_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -197,4 +179,5 @@ CREATE TABLE IF NOT EXISTS pc0ww_job_sync_logs_rw (
 Instructions
 1. when using it on teams run the above sql first on the diff sites and teams speific
 on the logs for the last_sync_id must be the latest id for that country on teams export table
+2. Also make sure the ids are changed to auto-increment for both team and job sites
  
