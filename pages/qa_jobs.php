@@ -16,9 +16,9 @@ if (isset($_POST['delete_rule_id'])) {
     try {
         $sql = "DELETE FROM qr_rules WHERE id = ?";
         if (db_query($sql, [$delete_id])) {
-            // $success = "QR rule deleted successfully!";
+            // $success = "QA rule deleted successfully!";
         } else {
-            $error = "Error deleting QR rule!";
+            $error = "Error deleting QA rule!";
         }
     } catch (Exception $e) {
         $error = "Error deleting: " . $e->getMessage();
@@ -36,7 +36,7 @@ if (isset($_POST['toggle_rule_id'])) {
             $new_status = $rule['is_active'] ? 0 : 1;
             $sql = "UPDATE qr_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
             if (db_query($sql, [$new_status, $toggle_id])) {
-                $success = "QR rule status updated!";
+                $success = "QA rule status updated!";
             }
         }
     } catch (Exception $e) {
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']) && !isset($_
                 ];
                 
                 if (db_query($sql, $params)) {
-                    $success = "QR rule updated successfully!";
+                    $success = "QA rule updated successfully!";
                 } else {
                     $error = "Error updating rule!";
                 }
@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']) && !isset($_
                 ];
                 
                 if (db_query($sql, $params)) {
-                    $success = "QR rule added successfully!";
+                    $success = "QA rule added successfully!";
                     // Clear form
                     $_POST = [];
                 } else {
@@ -178,7 +178,7 @@ if (isset($_GET['status']) && $_GET['status'] !== '') {
 // Build the WHERE clause
 $where_clause = implode(' AND ', $where_conditions);
 
-// Get all QR rules
+// Get all QA rules
 $qr_rules_query = "
     SELECT 
         id,
@@ -215,7 +215,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">
-            <i class="fas fa-qrcode text-primary"></i> QR Rules Management
+            <i class="fas fa-qrcode text-primary"></i> QA Rules Management
         </h1>
         <div class="btn-group">
             <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#addRuleModal">
@@ -381,7 +381,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                 <i class="fas fa-info-circle me-1"></i>
                                 Filtered results
                             </small>
-                            <a href="manage_qr_rules.php" class="btn btn-sm btn-outline-secondary">
+                            <a href="qa_jobs.php" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-times me-1"></i> Clear Filters
                             </a>
                         </div>
@@ -391,12 +391,12 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
         </div>
     </div>
 
-    <!-- QR Rules Table with Improved UI -->
+    <!-- QA Rules Table with Improved UI -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">
-                    <i class="fas fa-list me-2"></i> QR Rules List
+                    <i class="fas fa-list me-2"></i> QA Rules List
                     <span class="badge bg-light text-dark ms-2"><?php echo $total_rules; ?></span>
                 </h6>
                 <div class="dropdown">
@@ -425,12 +425,12 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     <div class="empty-state-icon">
                         <i class="fas fa-qrcode fa-4x text-muted"></i>
                     </div>
-                    <h4 class="mt-4 text-muted">No QR Rules Found</h4>
+                    <h4 class="mt-4 text-muted">No QA Rules Found</h4>
                     <p class="text-muted mb-4">
                         <?php if (!empty($search_term)): ?>
                             No rules matching "<?php echo htmlspecialchars($search_term); ?>"
                         <?php else: ?>
-                            Start by creating your first QR rule
+                            Start by creating your first QA rule
                         <?php endif; ?>
                     </p>
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRuleModal">
@@ -665,7 +665,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editRuleModalLabel">
-                    <i class="fas fa-plus-circle me-2"></i> Add New QR Rule
+                    <i class="fas fa-plus-circle me-2"></i> Add New QA Rule
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -843,7 +843,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                 <div class="welcome-icon">
                     <i class="fas fa-qrcode fa-4x text-primary mb-4"></i>
                 </div>
-                <h4>Create New QR Rule</h4>
+                <h4>Create New QA Rule</h4>
                 <p class="text-muted mb-4">Define rules for job posting quality, compliance, and requirements.</p>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal" 
@@ -975,7 +975,7 @@ function loadRuleForEdit(rule) {
     const handler = function() {
         // Now safely access the elements
         document.getElementById('editRuleModalLabel').innerHTML = 
-            `<i class="fas fa-edit me-2"></i> Edit QR Rule: ${rule.title.substring(0, 30)}${rule.title.length > 30 ? '...' : ''}`;
+            `<i class="fas fa-edit me-2"></i> Edit QA Rule: ${rule.title.substring(0, 30)}${rule.title.length > 30 ? '...' : ''}`;
         document.getElementById('rule_id').value = rule.id;
         document.getElementById('rule_title').value = rule.title;
         document.getElementById('rule_description').value = rule.description;
@@ -1015,7 +1015,7 @@ function openNewRuleForm() {
     const handler = function() {
         // Now safely access the elements
         document.getElementById('editRuleModalLabel').innerHTML = 
-            '<i class="fas fa-plus-circle me-2"></i> Add New QR Rule';
+            '<i class="fas fa-plus-circle me-2"></i> Add New QA Rule';
         document.getElementById('ruleForm').reset();
         document.getElementById('rule_id').value = '';
         document.getElementById('effective_date').value = '<?php echo date('Y-m-d'); ?>';
