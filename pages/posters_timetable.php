@@ -148,24 +148,30 @@ $allTeam = array_merge($postingTeam, $adminTeam);
 
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Posting Team Timetable</h1>
-        <div class="btn-group">
-            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportChallengeModal">
-                <i class="fas fa-exclamation-triangle"></i> Report Challenge
-            </button>
-            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#generateScheduleModal">
-                <i class="fas fa-calendar-alt"></i> Generate New Schedule
-            </button>
-            <button type="button" class="btn btn-outline-info" onclick="window.print()">
-                <i class="fas fa-print"></i> Print Timetable
-            </button>
-            <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#resolveChallengeModal">
-                <i class="fas fa-check-circle"></i> Resolve Challenge
-            </button>
-            <!-- NEW: Add Manual Backup Button -->
-            <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#addBackupModal">
-                <i class="fas fa-user-plus"></i> Add Manual Backup
-            </button>
+        <h1 class="h2 mb-2 mb-md-0">Posting Team Timetable</h1>
+        <div class="btn-toolbar mt-2 mt-md-0">
+            <div class="btn-group flex-wrap">
+                <button type="button" class="btn btn-outline-primary btn-sm mb-1" data-bs-toggle="modal" data-bs-target="#reportChallengeModal">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <span class="d-none d-md-inline">Report Challenge</span>
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm mb-1" data-bs-toggle="modal" data-bs-target="#generateScheduleModal">
+                    <i class="fas fa-calendar-alt"></i> 
+                    <span class="d-none d-md-inline">Generate New Schedule</span>
+                </button>
+                <button type="button" class="btn btn-outline-info btn-sm mb-1" onclick="window.print()">
+                    <i class="fas fa-print"></i> 
+                    <span class="d-none d-md-inline">Print Timetable</span>
+                </button>
+                <button class="btn btn-outline-success btn-sm mb-1" data-bs-toggle="modal" data-bs-target="#resolveChallengeModal">
+                    <i class="fas fa-check-circle"></i> 
+                    <span class="d-none d-md-inline">Resolve Challenge</span>
+                </button>
+                <button type="button" class="btn btn-outline-warning btn-sm mb-1" data-bs-toggle="modal" data-bs-target="#addBackupModal">
+                    <i class="fas fa-user-plus"></i> 
+                    <span class="d-none d-md-inline">Add Manual Backup</span>
+                </button>
+            </div>
         </div>
     </div>
 
