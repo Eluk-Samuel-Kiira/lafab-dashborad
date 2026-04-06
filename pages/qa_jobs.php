@@ -9,6 +9,54 @@ $error = '';
 $editing = false;
 $current_rule = null;
 
+/**
+ * Lightweight formatter for rule descriptions
+ * Converts markdown-like syntax to HTML safely
+ */
+function formatRuleDescription($text) {
+    if (empty($text)) return '';
+    
+    // First escape HTML to prevent XSS
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    
+    // Replace **bold** with <strong>
+    $text = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $text);
+    
+    // Replace *italic* with <em>
+    $text = preg_replace('/\*(.*?)\*/', '<em>$1</em>', $text);
+    
+    // Replace bullet points: • or - or * at start of line
+    $text = preg_replace('/^[•\-*]\s+(.*?)$/m', '<li>$1</li>', $text);
+    
+    // Wrap consecutive list items in <ul>
+    $text = preg_replace('/(<li>.*?<\/li>\n?)+/', '<ul class="mb-2">$0</ul>', $text);
+    
+    // Replace numbered lists: 1. 2. etc
+    $text = preg_replace('/^(\d+)\.\s+(.*?)$/m', '<li value="$1">$2</li>', $text);
+    $text = preg_replace('/(<li value="\d+">.*?<\/li>\n?)+/', '<ol class="mb-2">$0</ol>', $text);
+    
+    // Replace line breaks with <br> for single newlines, but keep paragraphs
+    $text = nl2br($text, false);
+    
+    // Clean up: remove empty paragraphs and fix spacing
+    $text = str_replace('<br><br>', '</p><p>', $text);
+    $text = '<div class="formatted-description">' . $text . '</div>';
+    
+    // Wrap consecutive <br> tags as paragraphs
+    $text = preg_replace('/<br>\s*<br>/', '</p><p>', $text);
+    
+    return $text;
+}
+
+/**
+ * Strip formatting for plain text preview
+ */
+function stripFormatting($text) {
+    $text = str_replace('**', '', $text);
+    $text = str_replace('*', '', $text);
+    return $text;
+}
+
 // Handle delete request
 if (isset($_POST['delete_rule_id'])) {
     $delete_id = intval($_POST['delete_rule_id']);
@@ -16,7 +64,7 @@ if (isset($_POST['delete_rule_id'])) {
     try {
         $sql = "DELETE FROM qr_rules WHERE id = ?";
         if (db_query($sql, [$delete_id])) {
-            // $success = "QA rule deleted successfully!";
+            $success = "QA rule deleted successfully!";
         } else {
             $error = "Error deleting QA rule!";
         }
@@ -113,8 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']) && !isset($_
                 
                 if (db_query($sql, $params)) {
                     $success = "QA rule added successfully!";
-                    // Clear form
-                    $_POST = [];
                 } else {
                     $error = "Error adding rule!";
                 }
@@ -133,10 +179,6 @@ if (isset($_GET['edit'])) {
         $editing = true;
     }
 }
-
-// Get all posters and websites for filters
-$posters = db_fetch_all("SELECT DISTINCT name FROM posters WHERE is_active = 1 ORDER BY name");
-$websites = $websites ?? ['Website A', 'Website B', 'Website C']; // From your config
 
 // Get rule types
 $rule_types = [
@@ -211,14 +253,13 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
 
 ?>
 
-
 <div class="col-md-9 col-lg-10 main-content">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">
             <i class="fas fa-qrcode text-primary"></i> QA Rules Management
         </h1>
         <div class="btn-group">
-            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#addRuleModal">
+            <button type="button" class="btn btn-outline-success" onclick="openAddRuleModal()">
                 <i class="fas fa-plus-circle"></i> Add New Rule
             </button>
             <button type="button" class="btn btn-outline-warning" onclick="applyQuickRules()">
@@ -241,7 +282,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
         </div>
     <?php endif; ?>
 
-    <!-- Stats Cards with improved UI -->
+    <!-- Stats Cards -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm stats-card-primary">
@@ -254,11 +295,6 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                         <div class="stats-icon">
                             <i class="fas fa-qrcode fa-2x"></i>
                         </div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            <i class="fas fa-history"></i> Last updated: Now
-                        </small>
                     </div>
                 </div>
             </div>
@@ -274,11 +310,6 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                         <div class="stats-icon">
                             <i class="fas fa-check-circle fa-2x"></i>
                         </div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            <?php echo $total_rules > 0 ? round(($active_rules/$total_rules)*100, 1) . '% of total' : '0% of total'; ?>
-                        </small>
                     </div>
                 </div>
             </div>
@@ -302,11 +333,6 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                             <i class="fas fa-exclamation-triangle fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            Priority 1-3 (Critical)
-                        </small>
-                    </div>
                 </div>
             </div>
         </div>
@@ -322,17 +348,12 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                             <i class="fas fa-tags fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            <?php echo implode(', ', array_slice(array_keys($rule_types), 0, 2)); ?>...
-                        </small>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Improved Filters Card -->
+    <!-- Filters Card -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-0 py-3">
             <h6 class="mb-0"><i class="fas fa-filter me-2"></i> Filter Rules</h6>
@@ -391,7 +412,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
         </div>
     </div>
 
-    <!-- QA Rules Table with Improved UI -->
+    <!-- QA Rules Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
             <div class="d-flex justify-content-between align-items-center">
@@ -399,24 +420,6 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     <i class="fas fa-list me-2"></i> QA Rules List
                     <span class="badge bg-light text-dark ms-2"><?php echo $total_rules; ?></span>
                 </h6>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
-                            data-bs-toggle="dropdown">
-                        <i class="fas fa-cog"></i> Options
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" onclick="exportRules()">
-                            <i class="fas fa-download me-2"></i> Export Rules
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" onclick="printRules()">
-                            <i class="fas fa-print me-2"></i> Print Rules
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addRuleModal">
-                            <i class="fas fa-plus me-2"></i> Add New Rule
-                        </a></li>
-                    </ul>
-                </div>
             </div>
         </div>
         <div class="card-body">
@@ -426,14 +429,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                         <i class="fas fa-qrcode fa-4x text-muted"></i>
                     </div>
                     <h4 class="mt-4 text-muted">No QA Rules Found</h4>
-                    <p class="text-muted mb-4">
-                        <?php if (!empty($search_term)): ?>
-                            No rules matching "<?php echo htmlspecialchars($search_term); ?>"
-                        <?php else: ?>
-                            Start by creating your first QA rule
-                        <?php endif; ?>
-                    </p>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRuleModal">
+                    <button type="button" class="btn btn-primary" onclick="openAddRuleModal()">
                         <i class="fas fa-plus-circle me-2"></i> Create First Rule
                     </button>
                 </div>
@@ -442,57 +438,56 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th width="50" class="text-center">
-                                    <i class="fas fa-star text-warning"></i>
-                                </th>
+                                <th width="50">Prio</th>
                                 <th>Rule Details</th>
-                                <th width="120" class="text-center">Type</th>
-                                <th width="100" class="text-center">Filters</th>
-                                <th width="120" class="text-center">Date Range</th>
-                                <th width="100" class="text-center">Status</th>
-                                <th width="140" class="text-center">Actions</th>
+                                <th width="120">Type</th>
+                                <th width="100">Filters</th>
+                                <th width="100">Status</th>
+                                <th width="140">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($qr_rules as $rule): ?>
-                                <tr class="rule-row" data-rule-id="<?php echo $rule['id']; ?>">
+                                <tr class="rule-row">
                                     <td class="text-center">
-                                        <div class="priority-indicator" data-priority="<?php echo $rule['priority']; ?>">
-                                            <span class="badge priority-badge priority-<?php echo $rule['priority']; ?>">
-                                                <?php echo $rule['priority']; ?>
-                                            </span>
+                                        <span class="badge priority-badge priority-<?php echo $rule['priority']; ?>">
+                                            <?php echo $rule['priority']; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <h6 class="mb-1 rule-title">
+                                                <i class="fas fa-gavel text-primary me-2"></i>
+                                                <?php echo htmlspecialchars($rule['title']); ?>
+                                            </h6>
+                                            <div class="rule-description-preview small text-muted">
+                                                <?php 
+                                                $plainDesc = strip_tags(str_replace('**', '', $rule['description']));
+                                                echo strlen($plainDesc) > 100 ? substr($plainDesc, 0, 100) . '...' : $plainDesc;
+                                                ?>
+                                                <?php if (strlen($plainDesc) > 100): ?>
+                                                    <a href="#" class="view-full-desc ms-1"
+                                                       data-description="<?php echo htmlspecialchars($rule['description']); ?>"
+                                                       data-title="<?php echo htmlspecialchars($rule['title']); ?>"
+                                                       data-website_filter="<?php echo $rule['website_filter']; ?>"
+                                                       data-poster_filter="<?php echo $rule['poster_filter']; ?>"
+                                                       data-effective_date="<?php echo $rule['effective_date']; ?>"
+                                                       data-expiry_date="<?php echo $rule['expiry_date']; ?>"
+                                                       data-created_by="<?php echo $rule['created_by']; ?>"
+                                                       data-created_at="<?php echo $rule['created_at']; ?>"
+                                                       data-min_job_count="<?php echo $rule['min_job_count']; ?>"
+                                                       data-max_job_count="<?php echo $rule['max_job_count']; ?>">
+                                                        <small>Read more</small>
+                                                    </a>
+                                                <?php endif; ?>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($rule['created_by']); ?>
+                                                <i class="fas fa-clock ms-2 me-1"></i><?php echo date('M j, Y', strtotime($rule['created_at'])); ?>
+                                            </small>
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="d-flex align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-1 rule-title">
-                                                    <i class="fas fa-gavel text-primary me-2"></i>
-                                                    <?php echo htmlspecialchars($rule['title']); ?>
-                                                </h6>
-                                                <p class="mb-1 text-muted rule-description-preview">
-                                                    <?php 
-                                                    $desc = htmlspecialchars($rule['description']);
-                                                    echo strlen($desc) > 120 ? substr($desc, 0, 120) . '...' : $desc;
-                                                    ?>
-                                                    <?php if (strlen($desc) > 120): ?>
-                                                        <a href="#" class="view-full-desc" 
-                                                           data-description="<?php echo htmlspecialchars($rule['description']); ?>"
-                                                           data-title="<?php echo htmlspecialchars($rule['title']); ?>">
-                                                            <small>Read more</small>
-                                                        </a>
-                                                    <?php endif; ?>
-                                                </p>
-                                                <small class="text-muted">
-                                                    <i class="fas fa-user text-muted me-1"></i>
-                                                    <?php echo htmlspecialchars($rule['created_by']); ?>
-                                                    <i class="fas fa-clock text-muted ms-2 me-1"></i>
-                                                    <?php echo date('M j, Y', strtotime($rule['created_at'])); ?>
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
                                         <span class="badge rule-type-badge bg-<?php 
                                             switch($rule['rule_type']) {
                                                 case 'general': echo 'primary'; break;
@@ -506,40 +501,25 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                             <?php echo htmlspecialchars($rule_types[$rule['rule_type']] ?? $rule['rule_type']); ?>
                                         </span>
                                     </td>
-                                    <td class="text-center">
-                                        <div class="filter-info">
+                                    <td>
+                                        <div class="small">
                                             <?php if ($rule['website_filter'] != 'all'): ?>
-                                                <span class="badge bg-light text-dark mb-1" title="Website Filter">
+                                                <span class="badge bg-light text-dark mb-1 d-block">
                                                     <i class="fas fa-globe me-1"></i><?php echo htmlspecialchars($rule['website_filter']); ?>
-                                                </span><br>
+                                                </span>
                                             <?php endif; ?>
                                             <?php if ($rule['poster_filter'] != 'all'): ?>
-                                                <span class="badge bg-light text-dark" title="Poster Filter">
+                                                <span class="badge bg-light text-dark d-block">
                                                     <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($rule['poster_filter']); ?>
                                                 </span>
                                             <?php endif; ?>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="date-range">
-                                            <small class="d-block text-muted">
-                                                <i class="fas fa-calendar-check me-1"></i>
-                                                <?php echo date('M j, Y', strtotime($rule['effective_date'])); ?>
-                                            </small>
-                                            <?php if ($rule['expiry_date']): ?>
-                                                <small class="d-block text-muted">
-                                                    <i class="fas fa-calendar-times me-1"></i>
-                                                    <?php echo date('M j, Y', strtotime($rule['expiry_date'])); ?>
-                                                </small>
-                                            <?php else: ?>
-                                                <small class="text-success">
-                                                    <i class="fas fa-infinity"></i> No expiry
-                                                </small>
+                                            <?php if ($rule['website_filter'] == 'all' && $rule['poster_filter'] == 'all'): ?>
+                                                <span class="text-muted">All</span>
                                             <?php endif; ?>
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <form method="POST" class="d-inline">
+                                        <form method="POST" class="d-inline" onsubmit="event.preventDefault(); toggleRuleStatus(<?php echo $rule['id']; ?>, <?php echo $rule['is_active']; ?>)">
                                             <input type="hidden" name="toggle_rule_id" value="<?php echo $rule['id']; ?>">
                                             <button type="submit" class="btn btn-sm status-toggle <?php echo $rule['is_active'] ? 'btn-success' : 'btn-secondary'; ?>">
                                                 <?php if ($rule['is_active']): ?>
@@ -551,22 +531,19 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                         </form>
                                     </td>
                                     <td class="text-center">
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <button type="button" class="btn btn-outline-primary btn-action" 
-                                                    data-bs-toggle="tooltip" title="View Details"
-                                                    onclick="viewRuleDetails(<?php echo htmlspecialchars(json_encode($rule)); ?>)">
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" 
+                                                    onclick='viewRuleDetails(<?php echo json_encode($rule); ?>)'>
                                                 <i class="fas fa-eye"></i>
                                             </button>
-                                            <button type="button" class="btn btn-outline-secondary btn-action" 
-                                                    data-bs-toggle="tooltip" title="Edit Rule"
-                                                    onclick="loadRuleForEdit(<?php echo htmlspecialchars(json_encode($rule)); ?>)">
+                                            <button type="button" class="btn btn-outline-secondary" 
+                                                    onclick='loadRuleForEdit(<?php echo json_encode($rule); ?>)'>
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <form method="POST" class="d-inline" 
                                                 onsubmit="return confirmDeleteRule('<?php echo addslashes($rule['title']); ?>')">
                                                 <input type="hidden" name="delete_rule_id" value="<?php echo $rule['id']; ?>">
-                                                <button type="submit" class="btn btn-outline-danger btn-action" 
-                                                        data-bs-toggle="tooltip" title="Delete Rule">
+                                                <button type="submit" class="btn btn-outline-danger">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </form>
@@ -577,42 +554,20 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                         </tbody>
                     </table>
                 </div>
-                
-                <!-- Summary -->
-                <div class="row mt-4">
-                    <div class="col-md-12">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <p class="mb-0 text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Showing <?php echo $total_rules; ?> rule(s)
-                                    <?php if (!empty($search_term)): ?>
-                                        matching "<strong><?php echo htmlspecialchars($search_term); ?></strong>"
-                                    <?php endif; ?>
-                                </p>
-                            </div>
-                            <div class="text-end">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="scrollToTop()">
-                                    <i class="fas fa-arrow-up me-1"></i> Back to Top
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
 
 <!-- View Full Description Modal -->
-<div class="modal fade" id="viewDescriptionModal" tabindex="-1" aria-labelledby="viewDescriptionModalLabel" aria-hidden="true">
+<div class="modal fade" id="viewDescriptionModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-light">
-                <h5 class="modal-title" id="viewDescriptionModalLabel">
+                <h5 class="modal-title">
                     <i class="fas fa-file-alt me-2"></i> Rule Details
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="rule-details-container">
@@ -620,7 +575,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     <div class="card bg-light mb-3">
                         <div class="card-body">
                             <h6 class="card-title text-muted mb-2">Description</h6>
-                            <div id="detailDescription" class="rule-description-content"></div>
+                            <div id="detailDescription" class="formatted-description"></div>
                         </div>
                     </div>
                     <div class="row">
@@ -659,17 +614,17 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
     </div>
 </div>
 
-<!-- Add/Edit Rule Modal (Fixed) -->
-<div class="modal fade" id="editRuleModal" tabindex="-1" aria-labelledby="editRuleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<!-- Add/Edit Rule Modal -->
+<div class="modal fade" id="editRuleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editRuleModalLabel">
                     <i class="fas fa-plus-circle me-2"></i> Add New QA Rule
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="ruleForm">
+            <form method="POST" id="ruleForm" onsubmit="return validateAndSubmit()">
                 <input type="hidden" name="rule_id" id="rule_id" value="">
                 <div class="modal-body">
                     <div class="row">
@@ -677,14 +632,13 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Rule Title <span class="text-danger">*</span></label>
                                 <input type="text" name="title" id="rule_title" class="form-control" required
-                                       placeholder="Enter rule title (e.g., 'Minimum Job Count Requirement')">
+                                       placeholder="Enter rule title">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Rule Type <span class="text-danger">*</span></label>
-                                <select name="rule_type" id="rule_type" class="form-select" required>
-                                    <option value="">Select Type</option>
+                                <label class="form-label fw-semibold">Rule Type</label>
+                                <select name="rule_type" id="rule_type" class="form-select">
                                     <?php foreach ($rule_types as $key => $label): ?>
                                         <option value="<?php echo $key; ?>"><?php echo $label; ?></option>
                                     <?php endforeach; ?>
@@ -696,15 +650,19 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Description <span class="text-danger">*</span></label>
                         <textarea name="description" id="rule_description" class="form-control" 
-                                  rows="4" required placeholder="Detailed description of the rule..."></textarea>
-                        <div class="form-text">Describe the rule in detail. This will be shown to users.</div>
+                            rows="10" placeholder="Write your rule description here..."></textarea>
+                        <div class="form-text small mt-2">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Formatting Guide:</strong> Use **bold**, *italic*, 
+                            • for bullet points, 1. for numbered lists.
+                        </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Priority <span class="text-danger">*</span></label>
-                                <select name="priority" id="rule_priority" class="form-select" required>
+                                <label class="form-label fw-semibold">Priority</label>
+                                <select name="priority" id="rule_priority" class="form-select">
                                     <?php for ($i = 1; $i <= 10; $i++): ?>
                                         <option value="<?php echo $i; ?>" <?php echo $i == 5 ? 'selected' : ''; ?>>
                                             <?php echo $i; ?> - <?php 
@@ -715,28 +673,28 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                         </option>
                                     <?php endfor; ?>
                                 </select>
-                                <div class="form-text">1 = Highest, 10 = Lowest</div>
                             </div>
                         </div>
-                        
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Min Job Count</label>
-                                <input type="number" name="min_job_count" id="min_job_count" 
-                                       class="form-control" min="0" placeholder="0">
-                                <div class="form-text">Minimum jobs to apply</div>
+                                <label class="form-label fw-semibold">Website Filter</label>
+                                <select name="website_filter" id="website_filter" class="form-select">
+                                    <option value="all">All Websites</option>
+                                    <option value="example.com">Example.com</option>
+                                    <option value="test.com">Test.com</option>
+                                </select>
                             </div>
                         </div>
-                        
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Max Job Count</label>
-                                <input type="number" name="max_job_count" id="max_job_count" 
-                                       class="form-control" min="1" placeholder="Leave empty for unlimited">
-                                <div class="form-text">Maximum jobs to apply</div>
+                                <label class="form-label fw-semibold">Poster Filter</label>
+                                <select name="poster_filter" id="poster_filter" class="form-select">
+                                    <option value="all">All Posters</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="user">User</option>
+                                </select>
                             </div>
                         </div>
-                        
                         <div class="col-md-3">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Status</label>
@@ -750,789 +708,435 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Website Filter</label>
-                                <select name="website_filter" id="website_filter" class="form-select">
-                                    <option value="all">All Websites</option>
-                                    <?php foreach ($websites as $site): ?>
-                                        <option value="<?php echo htmlspecialchars($site); ?>">
-                                            <?php echo htmlspecialchars($site); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-text">Apply rule to specific website only</div>
+                                <label class="form-label fw-semibold">Min Jobs</label>
+                                <input type="number" name="min_job_count" id="min_job_count" 
+                                       class="form-control" min="0" placeholder="0" value="0">
                             </div>
                         </div>
-                        
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Poster Filter</label>
-                                <select name="poster_filter" id="poster_filter" class="form-select">
-                                    <option value="all">All Posters</option>
-                                    <?php foreach ($posters as $poster): ?>
-                                        <option value="<?php echo htmlspecialchars($poster['name']); ?>">
-                                            <?php echo htmlspecialchars($poster['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-text">Apply rule to specific poster only</div>
+                                <label class="form-label fw-semibold">Max Jobs</label>
+                                <input type="number" name="max_job_count" id="max_job_count" 
+                                       class="form-control" min="1" placeholder="Unlimited">
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Effective Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold">Effective Date</label>
                                 <input type="date" name="effective_date" id="effective_date" 
-                                       class="form-control" required value="<?php echo date('Y-m-d'); ?>">
+                                       class="form-control" value="<?php echo date('Y-m-d'); ?>">
                             </div>
                         </div>
-                        
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Expiry Date</label>
                                 <input type="date" name="expiry_date" id="expiry_date" 
-                                       class="form-control" placeholder="Leave empty for no expiry">
+                                       class="form-control" placeholder="Optional">
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Preview Section -->
+                    <!-- Live Preview Section -->
                     <div class="card mt-3">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0"><i class="fas fa-eye"></i> Rule Preview</h6>
+                            <h6 class="mb-0"><i class="fas fa-eye"></i> Live Preview (Formatted Output)</h6>
                         </div>
                         <div class="card-body">
-                            <div id="rulePreview">
-                                <div class="d-flex align-items-start">
-                                    <span class="badge bg-info me-2 mt-1" id="previewPriority">5</span>
-                                    <div>
-                                        <strong id="previewTitle">Rule Title</strong>
-                                        <p class="mb-1 text-muted" id="previewDescription">Rule description will appear here...</p>
-                                        <small class="text-muted">
-                                            <span id="previewType">Type: General</span> | 
-                                            <span id="previewFilters">Filters: All websites, All posters</span> | 
-                                            <span id="previewDates">Effective: <?php echo date('M j, Y'); ?></span>
-                                        </small>
-                                    </div>
-                                </div>
+                            <div id="livePreview" class="formatted-description preview-box">
+                                <div class="text-muted">Start typing to see formatted preview...</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i> Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-1"></i> Save Rule
-                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Rule</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Add Rule Button Modal Trigger -->
-<div class="modal fade" id="addRuleModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-body text-center p-5">
-                <div class="welcome-icon">
-                    <i class="fas fa-qrcode fa-4x text-primary mb-4"></i>
-                </div>
-                <h4>Create New QA Rule</h4>
-                <p class="text-muted mb-4">Define rules for job posting quality, compliance, and requirements.</p>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal" 
-                            onclick="openNewRuleForm()">
-                        <i class="fas fa-plus-circle me-2"></i> Create New Rule
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-2"></i> Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- EasyMDE CSS and JS from CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 
+<style>
+/* Formatted description styles */
+.formatted-description {
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.formatted-description strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.formatted-description em {
+    font-style: italic;
+    color: #5a6e85;
+}
+
+.formatted-description ul, 
+.formatted-description ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.formatted-description li {
+    margin: 0.25rem 0;
+}
+
+.formatted-description p {
+    margin: 0.5rem 0;
+}
+
+.preview-box {
+    min-height: 120px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* Stats cards */
+.stats-card-primary { border-left: 4px solid #0d6efd; background: #f8f9fa; }
+.stats-card-success { border-left: 4px solid #198754; background: #f8f9fa; }
+.stats-card-info { border-left: 4px solid #0dcaf0; background: #f8f9fa; }
+.stats-card-warning { border-left: 4px solid #ffc107; background: #f8f9fa; }
+
+.stats-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stats-card-primary .stats-icon { background: rgba(13,110,253,0.1); color: #0d6efd; }
+.stats-card-success .stats-icon { background: rgba(25,135,84,0.1); color: #198754; }
+.stats-card-info .stats-icon { background: rgba(13,202,240,0.1); color: #0dcaf0; }
+.stats-card-warning .stats-icon { background: rgba(255,193,7,0.1); color: #ffc107; }
+
+.priority-badge {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.priority-1, .priority-2, .priority-3 { background: #dc3545; color: white; }
+.priority-4, .priority-5 { background: #ffc107; color: #000; }
+.priority-6, .priority-7, .priority-8 { background: #0dcaf0; color: #000; }
+.priority-9, .priority-10 { background: #6c757d; color: white; }
+
+.rule-type-badge { font-size: 0.7rem; padding: 0.3rem 0.6rem; border-radius: 6px; }
+.status-toggle { min-width: 90px; border-radius: 20px; }
+.rule-row:hover { background-color: rgba(0,123,255,0.02); }
+
+/* EasyMDE customization */
+.EasyMDEContainer .CodeMirror {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+}
+
+.EasyMDEContainer .editor-toolbar {
+    border-radius: 8px 8px 0 0;
+    border: 1px solid #ced4da;
+    border-bottom: none;
+}
+
+.EasyMDEContainer .editor-toolbar button {
+    border-radius: 4px;
+}
+
+.EasyMDEContainer .editor-toolbar button:hover {
+    background: #e9ecef;
+}
+
+.modal-xl {
+    max-width: 1200px;
+}
+</style>
 
 <script>
-// Current rule for details
+// Initialize EasyMDE for the description field
+let easyMDE = null;
 let currentRule = null;
 
-// Function to view rule details
-function viewRuleDetails(rule) {
-    currentRule = rule;
+// Formatter function for live preview (mirrors PHP formatter)
+function formatDescriptionForPreview(text) {
+    if (!text || text.trim() === '') return '<span class="text-muted">Start typing to see formatted preview...</span>';
     
-    // Set modal content
-    document.getElementById('viewDescriptionModalLabel').innerHTML = 
-        `<i class="fas fa-file-alt me-2"></i> ${rule.title}`;
-    document.getElementById('detailTitle').textContent = rule.title;
-    document.getElementById('detailDescription').innerHTML = 
-        rule.description.replace(/\n/g, '<br>');
-    
-    // Set filters
-    let filtersHtml = '';
-    if (rule.website_filter === 'all' && rule.poster_filter === 'all') {
-        filtersHtml = '<p class="mb-1"><i class="fas fa-check text-success me-2"></i>Applies to all websites and posters</p>';
-    } else {
-        if (rule.website_filter !== 'all') {
-            filtersHtml += `<p class="mb-1"><i class="fas fa-globe me-2"></i>Website: ${rule.website_filter}</p>`;
-        }
-        if (rule.poster_filter !== 'all') {
-            filtersHtml += `<p class="mb-1"><i class="fas fa-user me-2"></i>Poster: ${rule.poster_filter}</p>`;
-        }
-    }
-    if (rule.min_job_count > 0) {
-        filtersHtml += `<p class="mb-1"><i class="fas fa-sort-numeric-up me-2"></i>Minimum Jobs: ${rule.min_job_count}</p>`;
-    }
-    if (rule.max_job_count) {
-        filtersHtml += `<p class="mb-1"><i class="fas fa-sort-numeric-down me-2"></i>Maximum Jobs: ${rule.max_job_count}</p>`;
-    }
-    document.getElementById('detailFilters').innerHTML = filtersHtml;
-    
-    // Set dates
-    const effectiveDate = new Date(rule.effective_date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+    // Escape HTML
+    let formatted = text.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
     });
     
-    let datesHtml = `<p class="mb-1"><i class="fas fa-calendar-check me-2"></i>Effective: ${effectiveDate}</p>`;
-    if (rule.expiry_date) {
-        const expiryDate = new Date(rule.expiry_date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        datesHtml += `<p class="mb-1"><i class="fas fa-calendar-times me-2"></i>Expires: ${expiryDate}</p>`;
+    // Bold
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Italic
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Bullet points
+    formatted = formatted.replace(/^[•\-*]\s+(.*?)$/gm, '<li>$1</li>');
+    formatted = formatted.replace(/(<li>.*?<\/li>\n?)+/g, '<ul class="mb-2">$&</ul>');
+    // Numbered lists
+    formatted = formatted.replace(/^(\d+)\.\s+(.*?)$/gm, '<li value="$1">$2</li>');
+    formatted = formatted.replace(/(<li value="\d+">.*?<\/li>\n?)+/g, '<ol class="mb-2">$&</ol>');
+    // Line breaks
+    formatted = formatted.replace(/\n/g, '<br>');
+    
+    return formatted;
+}
+
+// Update live preview from EasyMDE
+function updateLivePreview() {
+    const preview = document.getElementById('livePreview');
+    if (preview && easyMDE) {
+        const markdown = easyMDE.value();
+        preview.innerHTML = formatDescriptionForPreview(markdown);
+    }
+}
+
+// Validate and submit form
+function validateAndSubmit() {
+    let description = '';
+    if (easyMDE) {
+        description = easyMDE.value();
     } else {
-        datesHtml += '<p class="mb-1"><i class="fas fa-infinity me-2"></i>No expiry date</p>';
+        description = document.getElementById('rule_description').value;
     }
     
-    datesHtml += `<p class="mb-0 text-muted small"><i class="fas fa-clock me-2"></i>Created: ${new Date(rule.created_at).toLocaleString()}</p>`;
+    const title = document.getElementById('rule_title').value.trim();
+    
+    if (!title) {
+        alert('Please enter a rule title');
+        document.getElementById('rule_title').focus();
+        return false;
+    }
+    
+    if (!description || description.trim() === '') {
+        alert('Please enter a rule description');
+        if (easyMDE) {
+            easyMDE.codemirror.focus();
+        }
+        return false;
+    }
+    
+    // Set the textarea value before submit
+    document.getElementById('rule_description').value = description;
+    return true;
+}
+
+// Toggle rule status
+function toggleRuleStatus(ruleId, currentStatus) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.style.display = 'none';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'toggle_rule_id';
+    input.value = ruleId;
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// View rule details
+function viewRuleDetails(rule) {
+    currentRule = rule;
+    document.getElementById('detailTitle').textContent = rule.title;
+    document.getElementById('detailDescription').innerHTML = formatDescriptionForPreview(rule.description);
+    
+    let filtersHtml = '';
+    if (rule.website_filter === 'all' && rule.poster_filter === 'all') {
+        filtersHtml = '<p class="mb-0">Applies to all websites and posters</p>';
+    } else {
+        if (rule.website_filter !== 'all') filtersHtml += `<p><i class="fas fa-globe me-2"></i>Website: ${rule.website_filter}</p>`;
+        if (rule.poster_filter !== 'all') filtersHtml += `<p><i class="fas fa-user me-2"></i>Poster: ${rule.poster_filter}</p>`;
+    }
+    if (rule.min_job_count > 0) filtersHtml += `<p><i class="fas fa-sort-numeric-up me-2"></i>Min Jobs: ${rule.min_job_count}</p>`;
+    if (rule.max_job_count) filtersHtml += `<p><i class="fas fa-sort-numeric-down me-2"></i>Max Jobs: ${rule.max_job_count}</p>`;
+    document.getElementById('detailFilters').innerHTML = filtersHtml || '<p class="text-muted">No filters</p>';
+    
+    let datesHtml = `<p><i class="fas fa-calendar-check me-2"></i>Effective: ${new Date(rule.effective_date).toLocaleDateString()}</p>`;
+    if (rule.expiry_date) {
+        datesHtml += `<p><i class="fas fa-calendar-times me-2"></i>Expires: ${new Date(rule.expiry_date).toLocaleDateString()}</p>`;
+    } else {
+        datesHtml += `<p><i class="fas fa-infinity me-2"></i>No expiry</p>`;
+    }
+    datesHtml += `<p class="small text-muted mt-2"><i class="fas fa-user me-1"></i>${rule.created_by} · ${new Date(rule.created_at).toLocaleString()}</p>`;
     document.getElementById('detailDates').innerHTML = datesHtml;
     
-    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('viewDescriptionModal'));
     modal.show();
 }
 
-// Function to edit current rule from details modal
+// Edit current rule from view modal
 function editCurrentRule() {
     if (currentRule) {
-        // Close the description modal first
-        const descModal = bootstrap.Modal.getInstance(document.getElementById('viewDescriptionModal'));
-        if (descModal) {
-            descModal.hide();
-        }
-        
-        // Wait a bit for modal to close completely
-        setTimeout(() => {
-            loadRuleForEdit(currentRule);
-        }, 300);
+        bootstrap.Modal.getInstance(document.getElementById('viewDescriptionModal')).hide();
+        setTimeout(() => loadRuleForEdit(currentRule), 300);
     }
 }
 
-// Fix for modal backdrop issue
-function fixModalBackdrop() {
-    // Remove any lingering backdrops
-    const backdrops = document.querySelectorAll('.modal-backdrop');
-    backdrops.forEach(backdrop => {
-        backdrop.parentNode.removeChild(backdrop);
-    });
-    
-    // Remove modal-open class if no modal is showing
-    const modals = document.querySelectorAll('.modal.show');
-    if (modals.length === 0) {
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = 'auto';
-        document.body.style.paddingRight = '0';
-    }
-}
-
-// Fixed loadRuleForEdit function
+// Load rule for editing
 function loadRuleForEdit(rule) {
-    // Store the rule data temporarily
-    window.currentEditRule = rule;
+    document.getElementById('editRuleModalLabel').innerHTML = `<i class="fas fa-edit me-2"></i> Edit: ${rule.title.substring(0, 40)}`;
+    document.getElementById('rule_id').value = rule.id;
+    document.getElementById('rule_title').value = rule.title;
+    document.getElementById('rule_type').value = rule.rule_type;
+    document.getElementById('rule_priority').value = rule.priority;
+    document.getElementById('min_job_count').value = rule.min_job_count || 0;
+    document.getElementById('max_job_count').value = rule.max_job_count || '';
+    document.getElementById('is_active').checked = rule.is_active == 1;
+    document.getElementById('website_filter').value = rule.website_filter || 'all';
+    document.getElementById('poster_filter').value = rule.poster_filter || 'all';
+    document.getElementById('effective_date').value = rule.effective_date;
+    document.getElementById('expiry_date').value = rule.expiry_date || '';
     
-    // Fix any backdrop issues first
-    fixModalBackdrop();
-    
-    // Show the modal first
-    const modal = new bootstrap.Modal(document.getElementById('editRuleModal'), {
-        backdrop: 'static',
-        keyboard: false
-    });
-    modal.show();
-    
-    // Wait for modal to be fully shown, then populate fields
-    const modalElement = document.getElementById('editRuleModal');
-    const handler = function() {
-        // Now safely access the elements
-        document.getElementById('editRuleModalLabel').innerHTML = 
-            `<i class="fas fa-edit me-2"></i> Edit QA Rule: ${rule.title.substring(0, 30)}${rule.title.length > 30 ? '...' : ''}`;
-        document.getElementById('rule_id').value = rule.id;
-        document.getElementById('rule_title').value = rule.title;
-        document.getElementById('rule_description').value = rule.description;
-        document.getElementById('rule_type').value = rule.rule_type;
-        document.getElementById('rule_priority').value = rule.priority;
-        document.getElementById('min_job_count').value = rule.min_job_count || '';
-        document.getElementById('max_job_count').value = rule.max_job_count || '';
-        document.getElementById('is_active').checked = rule.is_active == 1;
-        document.getElementById('website_filter').value = rule.website_filter;
-        document.getElementById('poster_filter').value = rule.poster_filter;
-        document.getElementById('effective_date').value = rule.effective_date;
-        document.getElementById('expiry_date').value = rule.expiry_date || '';
-        
-        // Update preview
-        updateRulePreview();
-        
-        // Remove the event listener after it runs once
-        modalElement.removeEventListener('shown.bs.modal', handler);
-    };
-    
-    modalElement.addEventListener('shown.bs.modal', handler);
-}
-
-// Fixed openNewRuleForm function
-function openNewRuleForm() {
-    fixModalBackdrop();
-    
-    // Show the modal first
-    const modal = new bootstrap.Modal(document.getElementById('editRuleModal'), {
-        backdrop: 'static',
-        keyboard: false
-    });
-    modal.show();
-    
-    // Wait for modal to be fully shown, then reset fields
-    const modalElement = document.getElementById('editRuleModal');
-    const handler = function() {
-        // Now safely access the elements
-        document.getElementById('editRuleModalLabel').innerHTML = 
-            '<i class="fas fa-plus-circle me-2"></i> Add New QA Rule';
-        document.getElementById('ruleForm').reset();
-        document.getElementById('rule_id').value = '';
-        document.getElementById('effective_date').value = '<?php echo date('Y-m-d'); ?>';
-        document.getElementById('rule_priority').value = '5';
-        document.getElementById('is_active').checked = true;
-        document.getElementById('website_filter').value = 'all';
-        document.getElementById('poster_filter').value = 'all';
-        
-        // Update preview
-        updateRulePreview();
-        
-        // Remove the event listener after it runs once
-        modalElement.removeEventListener('shown.bs.modal', handler);
-    };
-    
-    modalElement.addEventListener('shown.bs.modal', handler);
-}
-
-// Quick rules function
-function applyQuickRules() {
-    const quickRules = [
-        {
-            title: 'Daily Posting Quota - General Members',
-            description: '**Rule Objective:** Ensure consistent daily job posting activity from all posting members.\n\n' +
-                        '**Requirements:**\n• All posting members must post between **250 to 300 jobs** daily\n' +
-                        '• Minimum required: **250 jobs** per day\n• Maximum allowed: **300 jobs** per day\n' +
-                        '• Applies to **all regular posting members** (non-admin)\n\n' +
-                        '**Compliance Criteria:**\n✅ Member posts 250-300 jobs in a single day\n' +
-                        '❌ Member posts <250 jobs (under-quota)\n❌ Member posts >300 jobs (over-quota)',
-            rule_type: 'compliance',
-            priority: 3,
-            min_job_count: 250,
-            max_job_count: 300,
-            website_filter: 'all',
-            poster_filter: 'all'
-        },
-        {
-            title: 'Admin Weekly Posting Requirement',
-            description: '**Rule Objective:** Maintain consistent administrator engagement with job postings.\n\n' +
-                        '**Requirements:**\n• Administrators must post **minimum 50 jobs** on qualifying days\n' +
-                        '• Must meet requirement for **at least 2 days** per calendar week\n' +
-                        '• Week runs **Monday through Sunday**\n• Qualifying day = any day with ≥50 job posts\n\n' +
-                        '**Calculation Methodology:**\n1. Count jobs posted each day (Monday to Sunday)\n' +
-                        '2. Flag days with ≥50 jobs as "qualifying days"\n' +
-                        '3. Check if ≥2 qualifying days in the week\n4. Report weekly compliance status',
-            rule_type: 'compliance',
-            priority: 4,
-            min_job_count: 50,
-            website_filter: 'all',
-            poster_filter: 'all'
-        }
-    ];
+    // Set EasyMDE content
+    if (easyMDE) {
+        easyMDE.value(rule.description);
+        setTimeout(updateLivePreview, 100);
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('editRuleModal'));
     modal.show();
 }
 
-// Safer updateRulePreview function
-function updateRulePreview() {
-    // Check if elements exist before accessing them
-    const titleElement = document.getElementById('rule_title');
-    const descriptionElement = document.getElementById('rule_description');
-    const priorityElement = document.getElementById('rule_priority');
-    const typeElement = document.getElementById('rule_type');
-    const websiteFilterElement = document.getElementById('website_filter');
-    const posterFilterElement = document.getElementById('poster_filter');
-    const effectiveDateElement = document.getElementById('effective_date');
+// Open add rule modal
+function openAddRuleModal() {
+    document.getElementById('editRuleModalLabel').innerHTML = '<i class="fas fa-plus-circle me-2"></i> Add New QA Rule';
+    document.getElementById('ruleForm').reset();
+    document.getElementById('rule_id').value = '';
+    document.getElementById('effective_date').value = '<?php echo date('Y-m-d'); ?>';
+    document.getElementById('rule_priority').value = '5';
+    document.getElementById('is_active').checked = true;
+    document.getElementById('website_filter').value = 'all';
+    document.getElementById('poster_filter').value = 'all';
+    document.getElementById('min_job_count').value = '0';
+    document.getElementById('max_job_count').value = '';
+    document.getElementById('rule_title').value = '';
     
-    // If any required element doesn't exist, return early
-    if (!titleElement || !descriptionElement || !priorityElement || !typeElement || 
-        !websiteFilterElement || !posterFilterElement || !effectiveDateElement) {
-        console.log('Preview elements not found');
-        return;
+    // Clear EasyMDE content
+    if (easyMDE) {
+        easyMDE.value('');
+        updateLivePreview();
     }
     
-    const title = titleElement.value || 'Rule Title';
-    const description = descriptionElement.value || 'Rule description will appear here...';
-    const priority = priorityElement.value || 5;
-    const type = typeElement.options[typeElement.selectedIndex]?.text || 'General Rule';
-    const websiteFilter = websiteFilterElement.value || 'all';
-    const posterFilter = posterFilterElement.value || 'all';
-    const effectiveDate = effectiveDateElement.value || '<?php echo date('Y-m-d'); ?>';
-    
-    // Format date
-    const dateObj = new Date(effectiveDate);
-    const formattedDate = dateObj.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
-    });
-    
-    // Build filters text
-    let filtersText = '';
-    if (websiteFilter === 'all' && posterFilter === 'all') {
-        filtersText = 'All websites, All posters';
-    } else if (websiteFilter === 'all') {
-        filtersText = `All websites, Poster: ${posterFilter}`;
-    } else if (posterFilter === 'all') {
-        filtersText = `Website: ${websiteFilter}, All posters`;
-    } else {
-        filtersText = `Website: ${websiteFilter}, Poster: ${posterFilter}`;
-    }
-    
-    // Update preview if elements exist
-    const previewTitle = document.getElementById('previewTitle');
-    const previewDescription = document.getElementById('previewDescription');
-    const previewPriority = document.getElementById('previewPriority');
-    const previewType = document.getElementById('previewType');
-    const previewFilters = document.getElementById('previewFilters');
-    const previewDates = document.getElementById('previewDates');
-    
-    if (previewTitle) previewTitle.textContent = title;
-    if (previewDescription) {
-        previewDescription.textContent = description.length > 100 ? 
-            description.substring(0, 100) + '...' : description;
-    }
-    if (previewPriority) {
-        previewPriority.textContent = priority;
-        previewPriority.className = `badge me-2 mt-1 priority-badge priority-${priority}`;
-    }
-    if (previewType) previewType.textContent = `Type: ${type}`;
-    if (previewFilters) previewFilters.textContent = `Filters: ${filtersText}`;
-    if (previewDates) previewDates.textContent = `Effective: ${formattedDate}`;
+    const modal = new bootstrap.Modal(document.getElementById('editRuleModal'));
+    modal.show();
 }
 
-// Helper functions
+// Apply quick rules template
+function applyQuickRules() {
+    const quickDesc = `**Rule Objective:** Ensure consistent daily job posting activity from all posting members.
+
+**Requirements:**
+• All posting members must post between **250 to 300 jobs** daily
+• Minimum required: **250 jobs** per day
+• Maximum allowed: **300 jobs** per day
+• Applies to **all regular posting members** (non-admin)
+
+**Compliance Criteria:**
+✅ Member posts 250-300 jobs in a single day
+❌ Member posts <250 jobs (under-quota)
+❌ Member posts >300 jobs (over-quota)`;
+
+    document.getElementById('rule_title').value = 'Daily Posting Quota - General Members';
+    document.getElementById('rule_type').value = 'compliance';
+    document.getElementById('rule_priority').value = '3';
+    document.getElementById('min_job_count').value = '250';
+    document.getElementById('max_job_count').value = '300';
+    document.getElementById('website_filter').value = 'all';
+    document.getElementById('poster_filter').value = 'all';
+    
+    if (easyMDE) {
+        easyMDE.value(quickDesc);
+        setTimeout(updateLivePreview, 100);
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('editRuleModal'));
+    modal.show();
+}
+
+// Confirm delete
 function confirmDeleteRule(title) {
-    return confirm(`Are you sure you want to delete this rule?\n\n"${title}"\n\nThis action cannot be undone.`);
+    return confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`);
 }
 
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function exportRules() {
-    alert('Export functionality coming soon!');
-}
-
-function printRules() {
-    window.print();
-}
-
-// Initialize everything when DOM is loaded
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle "Read more" clicks
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('view-full-desc') || 
-            e.target.parentElement.classList.contains('view-full-desc')) {
-            e.preventDefault();
-            const link = e.target.classList.contains('view-full-desc') ? e.target : e.target.parentElement;
-            const description = link.getAttribute('data-description');
-            const title = link.getAttribute('data-title');
-            
-            // Create a temporary rule object
-            const tempRule = {
-                title: title,
-                description: description,
-                website_filter: 'all',
-                poster_filter: 'all',
-                effective_date: '<?php echo date('Y-m-d'); ?>',
-                created_at: 'Just now'
-            };
-            
-            viewRuleDetails(tempRule);
-        }
-    });
-    
-    // Initialize tooltips
-    const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    tooltips.forEach(tooltip => {
-        new bootstrap.Tooltip(tooltip);
-    });
-    
-    // Fix modal backdrop on close
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.addEventListener('hidden.bs.modal', function() {
-            setTimeout(fixModalBackdrop, 100);
-        });
-    });
-    
-    // Add keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-        // Ctrl+Shift+N for new rule
-        if (e.ctrlKey && e.shiftKey && e.key === 'N') {
-            e.preventDefault();
-            openNewRuleForm();
-        }
-        
-        // Escape key
-        if (e.key === 'Escape') {
-            fixModalBackdrop();
-        }
-    });
-    
-    // Auto-focus search
-    <?php if (!empty($search_term)): ?>
-        document.querySelector('input[name="search"]').focus();
-    <?php endif; ?>
-    
-    // Setup event listeners for preview updates
-    const setupPreviewListeners = () => {
-        const inputs = ['rule_title', 'rule_description', 'rule_priority', 'rule_type', 
-                        'website_filter', 'poster_filter', 'effective_date'];
-        
-        inputs.forEach(inputId => {
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.addEventListener('input', updateRulePreview);
-                input.addEventListener('change', updateRulePreview);
+    // Initialize EasyMDE on the textarea
+    const textarea = document.getElementById('rule_description');
+    if (textarea) {
+        easyMDE = new EasyMDE({
+            element: textarea,
+            autoDownloadFontAwesome: false,
+            spellChecker: false,
+            placeholder: "Write your rule description here... Use **bold**, *italic*, bullet points, and numbered lists.",
+            toolbar: [
+                "bold", "italic", "heading", "|",
+                "unordered-list", "ordered-list", "|",
+                "link", "image", "|",
+                "preview", "side-by-side", "fullscreen", "|",
+                "guide"
+            ],
+            renderingConfig: {
+                singleLineBreaks: true,
+                codeSyntaxHighlighting: false,
+            },
+            previewRender: function(plainText) {
+                return formatDescriptionForPreview(plainText);
             }
         });
-    };
+        
+        // Update live preview when content changes
+        easyMDE.codemirror.on('change', function() {
+            updateLivePreview();
+        });
+    }
     
-    // Setup preview listeners when edit modal is shown
+    // Handle "Read more" links
+    document.querySelectorAll('.view-full-desc').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const rule = {
+                title: this.getAttribute('data-title'),
+                description: this.getAttribute('data-description'),
+                website_filter: this.getAttribute('data-website_filter'),
+                poster_filter: this.getAttribute('data-poster_filter'),
+                effective_date: this.getAttribute('data-effective_date'),
+                expiry_date: this.getAttribute('data-expiry_date'),
+                created_by: this.getAttribute('data-created_by'),
+                created_at: this.getAttribute('data-created_at'),
+                min_job_count: this.getAttribute('data-min_job_count'),
+                max_job_count: this.getAttribute('data-max_job_count')
+            };
+            viewRuleDetails(rule);
+        });
+    });
+    
+    // Ensure preview updates when modal is shown
     const editModal = document.getElementById('editRuleModal');
     if (editModal) {
-        editModal.addEventListener('shown.bs.modal', setupPreviewListeners);
-    }
-    
-    <?php if ($editing && $current_rule): ?>
-        // Load editing rule after page loads
-        setTimeout(() => {
-            loadRuleForEdit(<?php echo json_encode($current_rule); ?>);
-        }, 500);
-    <?php endif; ?>
-    
-    // Add event listeners for form validation
-    const ruleForm = document.getElementById('ruleForm');
-    if (ruleForm) {
-        ruleForm.addEventListener('submit', function(e) {
-            const minJob = document.getElementById('min_job_count')?.value;
-            const maxJob = document.getElementById('max_job_count')?.value;
-            const effectiveDate = document.getElementById('effective_date')?.value;
-            const expiryDate = document.getElementById('expiry_date')?.value;
-            
-            // Validate job counts
-            if (minJob && parseInt(minJob) < 0) {
-                alert('Minimum job count cannot be negative!');
-                e.preventDefault();
-                return;
-            }
-            
-            if (maxJob && parseInt(maxJob) < 0) {
-                alert('Maximum job count cannot be negative!');
-                e.preventDefault();
-                return;
-            }
-            
-            if (minJob && maxJob && parseInt(minJob) > parseInt(maxJob)) {
-                alert('Minimum job count cannot be greater than maximum job count!');
-                e.preventDefault();
-                return;
-            }
-            
-            // Validate dates
-            if (expiryDate && new Date(expiryDate) < new Date(effectiveDate)) {
-                alert('Expiry date cannot be before effective date!');
-                e.preventDefault();
-                return;
+        editModal.addEventListener('shown.bs.modal', function() {
+            if (easyMDE) {
+                easyMDE.codemirror.refresh();
+                setTimeout(updateLivePreview, 100);
             }
         });
     }
 });
 </script>
-
-
-<style>
-    /* Improved CSS */
-    .stats-card-primary {
-        border-left: 4px solid #0d6efd;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-
-    .stats-card-success {
-        border-left: 4px solid #198754;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-
-    .stats-card-info {
-        border-left: 4px solid #0dcaf0;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-
-    .stats-card-warning {
-        border-left: 4px solid #ffc107;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-
-    .stats-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 123, 255, 0.1);
-    }
-
-    .stats-card-primary .stats-icon {
-        background: rgba(13, 110, 253, 0.1);
-        color: #0d6efd;
-    }
-
-    .stats-card-success .stats-icon {
-        background: rgba(25, 135, 84, 0.1);
-        color: #198754;
-    }
-
-    .stats-card-info .stats-icon {
-        background: rgba(13, 202, 240, 0.1);
-        color: #0dcaf0;
-    }
-
-    .stats-card-warning .stats-icon {
-        background: rgba(255, 193, 7, 0.1);
-        color: #ffc107;
-    }
-
-    /* Table improvements */
-    .rule-row:hover {
-        background-color: rgba(0, 123, 255, 0.02);
-        transform: translateX(2px);
-        transition: all 0.2s ease;
-    }
-
-    .priority-badge {
-        font-size: 0.8em;
-        padding: 0.4em 0.8em;
-        border-radius: 20px;
-        font-weight: 600;
-    }
-
-    .priority-1, .priority-2, .priority-3 {
-        background: linear-gradient(45deg, #dc3545, #fd7e14);
-        color: white;
-    }
-
-    .priority-4, .priority-5 {
-        background: linear-gradient(45deg, #ffc107, #fd7e14);
-        color: #000;
-    }
-
-    .priority-6, .priority-7, .priority-8 {
-        background: linear-gradient(45deg, #0dcaf0, #20c997);
-        color: white;
-    }
-
-    .priority-9, .priority-10 {
-        background: linear-gradient(45deg, #6c757d, #adb5bd);
-        color: white;
-    }
-
-    .rule-type-badge {
-        font-size: 0.75em;
-        padding: 0.35em 0.65em;
-        border-radius: 6px;
-    }
-
-    .btn-action {
-        border-radius: 6px;
-        padding: 0.375rem 0.75rem;
-        transition: all 0.2s ease;
-    }
-
-    .btn-action:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .status-toggle {
-        min-width: 90px;
-        border-radius: 20px;
-        transition: all 0.3s ease;
-    }
-
-    .status-toggle:hover {
-        transform: scale(1.05);
-    }
-
-    .rule-description-preview {
-        line-height: 1.5;
-        color: #6c757d;
-    }
-
-    .view-full-desc {
-        color: #0d6efd;
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .view-full-desc:hover {
-        text-decoration: underline;
-    }
-
-    /* Modal improvements */
-    .modal-content {
-        border-radius: 12px;
-        border: none;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-    }
-
-    .modal-header {
-        border-bottom: 1px solid rgba(0,0,0,0.1);
-        padding: 1.2rem 1.5rem;
-    }
-
-    .modal-body {
-        padding: 1.5rem;
-    }
-
-    .modal-footer {
-        border-top: 1px solid rgba(0,0,0,0.1);
-        padding: 1.2rem 1.5rem;
-    }
-
-    .rule-description-content {
-        line-height: 1.7;
-        font-size: 1.05em;
-        color: #495057;
-    }
-
-    /* Empty state */
-    .empty-state {
-        padding: 4rem 2rem;
-    }
-
-    .empty-state-icon {
-        opacity: 0.5;
-        margin-bottom: 1.5rem;
-    }
-
-    /* Form improvements */
-    .form-control, .form-select {
-        border: 1px solid #ced4da;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        transition: all 0.2s ease;
-    }
-
-    .form-control:focus, .form-select:focus {
-        border-color: #86b7fe;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
-        transform: translateY(-1px);
-    }
-
-    /* Responsive improvements */
-    @media (max-width: 768px) {
-        .stats-card .card-body {
-            padding: 1rem;
-        }
-        
-        .btn-group-sm .btn-action {
-            padding: 0.25rem 0.5rem;
-        }
-        
-        .modal-dialog {
-            margin: 0.5rem;
-        }
-        
-        .table-responsive {
-            font-size: 0.9em;
-        }
-    }
-
-    /* Animation for success alerts */
-    @keyframes slideIn {
-        from {
-            transform: translateX(-100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-
-    .alert-success {
-        animation: slideIn 0.3s ease-out;
-    }
-
-    /* Smooth transitions */
-    .card, .btn, .form-control, .modal-content {
-        transition: all 0.3s ease;
-    }
-
-    /* Better scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
-        border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
-    }
-
-    /* Print styles */
-    @media print {
-        .btn, .dropdown, .modal, .alert {
-            display: none !important;
-        }
-        
-        .card {
-            border: 1px solid #dee2e6 !important;
-            box-shadow: none !important;
-        }
-    }
-</style>
 
 <?php require_once '../includes/footer.php'; ?>

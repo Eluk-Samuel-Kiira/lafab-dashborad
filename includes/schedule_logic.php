@@ -14,7 +14,7 @@ class ScheduleLogic {
     private $posting_team = [
         'Mukhwana Colette' => ['type' => 'poster', 'priority' => 1],
         'Viola Charlotte' => ['type' => 'poster', 'priority' => 2],
-        'Judith Kiiza' => ['type' => 'poster', 'priority' => 3]
+        'Juliet Kemgisha' => ['type' => 'poster', 'priority' => 3]
     ];
     
     // Admin team for backup
@@ -37,6 +37,14 @@ class ScheduleLogic {
             'type' => 'admin',
             'comfort_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
             'department' => 'Business Development',
+            'priority' => 6,
+            'max_days_per_week' => 5,
+            'field_days' => []
+        ],
+        'Cassandra Leah' => [
+            'type' => 'admin',
+            'comfort_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            'department' => 'Maids Business',
             'priority' => 6,
             'max_days_per_week' => 5,
             'field_days' => []

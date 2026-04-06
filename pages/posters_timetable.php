@@ -141,8 +141,8 @@ if (empty($schedule)) {
 }
 
 // Get team members for dropdowns
-$postingTeam = ['Mukhwana Colette', 'Viola Charlotte', 'Judith Kiiza'];
-$adminTeam = ['Evie', 'Mathias Kyam', 'Patricia Nakabugo', 'Samuel Kiira'];
+$postingTeam = ['Mukhwana Colette', 'Viola Charlotte', 'Juliet Kemgisha'];
+$adminTeam = ['Evie', 'Mathias Kyam', 'Patricia Nakabugo', 'Samuel Kiira', 'Cassandra Leah'];
 $allTeam = array_merge($postingTeam, $adminTeam);
 ?>
 
@@ -729,11 +729,12 @@ $allTeam = array_merge($postingTeam, $adminTeam);
                             $teamPerformance = [
                                 ['Mukhwana Colette', 'Primary Poster', 5, 0, '100%'],
                                 ['Viola Charlotte', 'Primary Poster', 5, 0, '100%'],
-                                ['Judith Kiiza', 'Primary Poster', 5, 0, '100%'],
+                                ['Juliet Kemgisha', 'Primary Poster', 5, 0, '100%'],
                                 ['Evie', 'Admin (HR)', 2, 0, '100%'],
                                 ['Mathias Kyam', 'Admin (Operations)', 2, 0, '100%'],
                                 ['Patricia Nakabugo', 'Admin (Business Dev)', 5, 1, '98%'],
-                                ['Samuel Kiira', 'Admin (ICT)', 2, 0, '100%']
+                                ['Samuel Kiira', 'Admin (ICT)', 2, 0, '100%'],
+                                ['Cassandra Leah', 'Admin (Maid Business)', 2, 0, '100%']
                             ];
                             
                             foreach ($teamPerformance as $member): ?>
