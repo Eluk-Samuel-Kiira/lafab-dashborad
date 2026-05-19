@@ -147,7 +147,7 @@ foreach ($platform_cards_data as $platform_name => $data) {
 
 $average_growth = $platforms_with_data > 0 ? $total_growth / $platforms_with_data : 0;
 
-// Get data for line chart (last 6 months - total followers per platform)
+// FIXED: Get data for line chart - get ALL months data properly
 $line_chart_data = db_fetch_all("
     SELECT 
         strftime('%Y-%m', sms.stat_date) as month,
@@ -156,38 +156,78 @@ $line_chart_data = db_fetch_all("
     FROM social_media_daily_stats sms
     JOIN social_media_platforms p ON sms.platform_id = p.id
     WHERE strftime('%Y', sms.stat_date) = ?
-    AND strftime('%Y-%m', sms.stat_date) IN (
-        SELECT DISTINCT strftime('%Y-%m', stat_date) 
-        FROM social_media_daily_stats 
-        WHERE strftime('%Y', stat_date) = ?
-        ORDER BY stat_date DESC 
-        LIMIT 6
-    )
     GROUP BY strftime('%Y-%m', sms.stat_date), p.name
     ORDER BY month ASC
-", [$year_filter, $year_filter]);
+", [$year_filter]);
 
-// Organize line chart data by platform
-$line_chart_by_platform = [];
+// Process data for chart
 $all_months = [];
+$platform_data_map = [];
 
 foreach ($line_chart_data as $data) {
-    $platform = $data['platform'];
     $month = $data['month'];
+    $platform = $data['platform'];
+    $followers = $data['total_followers'];
     
-    if (!isset($line_chart_by_platform[$platform])) {
-        $line_chart_by_platform[$platform] = [];
-    }
-    
-    $line_chart_by_platform[$platform][$month] = $data['total_followers'];
-    
+    // Collect all unique months
     if (!in_array($month, $all_months)) {
         $all_months[] = $month;
     }
+    
+    // Store data by platform
+    if (!isset($platform_data_map[$platform])) {
+        $platform_data_map[$platform] = [];
+    }
+    $platform_data_map[$platform][$month] = $followers;
 }
 
 // Sort months chronologically
 sort($all_months);
+
+// Take only last 6 months
+$all_months = array_slice($all_months, -6);
+
+// Prepare line chart datasets
+$line_chart_datasets = [];
+$platform_colors = [
+    'Facebook' => '#1877F2',
+    'Instagram' => '#E4405F',
+    'Twitter' => '#1DA1F2',
+    'LinkedIn' => '#0A66C2',
+    'TikTok' => '#000000',
+    'Telegram' => '#0088CC',
+    'WhatsApp' => '#25D366',
+    'YouTube' => '#FF0000'
+];
+
+foreach ($platform_data_map as $platform => $monthly_data) {
+    $data_array = [];
+    foreach ($all_months as $month) {
+        $data_array[] = isset($monthly_data[$month]) ? $monthly_data[$month] : null;
+    }
+    
+    // Only add if there's at least one non-null value
+    if (count(array_filter($data_array)) > 0) {
+        $line_chart_datasets[] = [
+            'label' => $platform,
+            'data' => $data_array,
+            'borderColor' => $platform_colors[$platform] ?? '#6c757d',
+            'backgroundColor' => ($platform_colors[$platform] ?? '#6c757d') . '20',
+            'borderWidth' => 3,
+            'fill' => false,
+            'tension' => 0.3,
+            'pointRadius' => 4,
+            'pointHoverRadius' => 6,
+            'pointBackgroundColor' => $platform_colors[$platform] ?? '#6c757d'
+        ];
+    }
+}
+
+// Format months for display
+$formatted_months = array_map(function($month) {
+    $date = DateTime::createFromFormat('Y-m', $month);
+    return $date ? $date->format('M Y') : $month;
+}, $all_months);
 ?>
 
 <div class="col-md-9 col-lg-10 main-content">
@@ -327,19 +367,16 @@ sort($all_months);
                             <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
                                 <div class="card stat-card h-100">
                                     <div class="card-body text-center">
-                                        <!-- Platform Name -->
                                         <h6 class="card-title text-primary">
                                             <i class="fas fa-chart-line me-1"></i>
                                             <?php echo $platform_name; ?>
                                         </h6>
                                         
-                                        <!-- Total Followers (Sum across all countries) -->
                                         <h3 class="text-dark mb-2">
                                             <?php echo number_format($data['current_followers']); ?>
                                         </h3>
                                         <small class="text-muted">Total Followers</small>
                                         
-                                        <!-- Growth Percentage -->
                                         <div class="mt-3">
                                             <span class="badge bg-<?php echo $growth_class; ?> p-2">
                                                 <i class="fas <?php echo $growth_icon; ?> me-1"></i>
@@ -350,7 +387,6 @@ sort($all_months);
                                             </small>
                                         </div>
                                         
-                                        <!-- Previous Month Comparison -->
                                         <div class="mt-3">
                                             <div class="progress" style="height: 8px;">
                                                 <?php 
@@ -368,7 +404,7 @@ sort($all_months);
                                                      title="Previous Month: <?php echo number_format($data['prev_followers']); ?>">
                                                 </div>
                                                 <div class="progress-bar bg-primary" 
-                                                     style="width: <?php echo $current_width - $prev_width; ?>%"
+                                                     style="width: <?php echo max(0, $current_width - $prev_width); ?>%"
                                                      title="Growth: <?php echo number_format($data['current_followers'] - $data['prev_followers']); ?>">
                                                 </div>
                                             </div>
@@ -379,7 +415,6 @@ sort($all_months);
                                             </small>
                                         </div>
                                         
-                                        <!-- Month Display -->
                                         <?php if ($data['current_month']): ?>
                                             <div class="mt-2">
                                                 <small class="text-muted">
@@ -416,7 +451,6 @@ sort($all_months);
 
     <!-- Charts Section -->
     <div class="row mb-4">
-        <!-- Monthly Growth Trends (Line Chart) -->
         <div class="col-lg-12 mb-4">
             <div class="card h-100">
                 <div class="card-header">
@@ -484,72 +518,20 @@ sort($all_months);
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-// Platform colors for charts
-const platformColors = {
-    'Facebook': '#1877F2',
-    'Instagram': '#E4405F',
-    'Twitter': '#1DA1F2',
-    'LinkedIn': '#0A66C2',
-    'TikTok': '#000000',
-    'Telegram': '#0088CC',
-    'WhatsApp': '#25D366',
-    'YouTube': '#FF0000'
-};
+// Chart data
+const chartMonths = <?php echo json_encode($formatted_months); ?>;
+const chartDatasets = <?php echo json_encode($line_chart_datasets); ?>;
 
-// Prepare data for Growth Trends Chart (Line Chart)
-const allMonths = <?php echo json_encode($all_months); ?>;
-const formattedMonths = allMonths.map(month => {
-    const [year, monthNum] = month.split('-');
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[parseInt(monthNum) - 1]} '${year.toString().slice(-2)}`;
-});
-
-const lineChartByPlatform = <?php echo json_encode($line_chart_by_platform); ?>;
-
-const growthTrendsData = {
-    labels: formattedMonths,
-    datasets: [
-        <?php 
-        if (!empty($line_chart_by_platform)):
-            foreach ($line_chart_by_platform as $platform_name => $platform_data): 
-                if (Object.keys(platform_data).length > 0): // Only include platforms with data
-        ?>
-        {
-            label: '<?php echo $platform_name; ?>',
-            data: [
-                <?php 
-                foreach ($all_months as $month) {
-                    if (platform_data[month] !== undefined) {
-                        echo platform_data[month] . ',';
-                    } else {
-                        echo 'null,';
-                    }
-                }
-                ?>
-            ],
-            borderColor: platformColors['<?php echo $platform_name; ?>'] || '#666666',
-            backgroundColor: (platformColors['<?php echo $platform_name; ?>'] || '#666666') + '20',
-            borderWidth: 3,
-            fill: false,
-            tension: 0.3,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointBackgroundColor: platformColors['<?php echo $platform_name; ?>'] || '#666666'
-        },
-        <?php 
-                endif;
-            endforeach;
-        endif; 
-        ?>
-    ]
-};
-
-// Growth Trends Chart (Line Chart)
-if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
-    const growthTrendsCtx = document.getElementById('growthTrendsChart').getContext('2d');
-    new Chart(growthTrendsCtx, {
+// Create chart if there's data
+const chartContainer = document.getElementById('growthTrendsChart');
+if (chartContainer && chartDatasets.length > 0 && chartMonths.length > 0) {
+    const ctx = chartContainer.getContext('2d');
+    new Chart(ctx, {
         type: 'line',
-        data: growthTrendsData,
+        data: {
+            labels: chartMonths,
+            datasets: chartDatasets
+        },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -562,13 +544,6 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
                         usePointStyle: true
                     }
                 },
-                title: {
-                    display: true,
-                    text: 'Total Followers Trend (Last 6 Months)',
-                    font: {
-                        size: 16
-                    }
-                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -577,7 +552,15 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat().format(context.parsed.y) + ' followers';
+                                if (context.parsed.y >= 1000000) {
+                                    label += (context.parsed.y / 1000000).toFixed(1) + 'M followers';
+                                } else if (context.parsed.y >= 1000) {
+                                    label += (context.parsed.y / 1000).toFixed(1) + 'K followers';
+                                } else {
+                                    label += context.parsed.y.toLocaleString() + ' followers';
+                                }
+                            } else {
+                                label += 'No data';
                             }
                             return label;
                         }
@@ -586,7 +569,7 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
             },
             scales: {
                 y: {
-                    beginAtZero: false,
+                    beginAtZero: true,
                     title: {
                         display: true,
                         text: 'Total Followers'
@@ -606,6 +589,10 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
                     }
                 },
                 x: {
+                    title: {
+                        display: true,
+                        text: 'Month'
+                    },
                     grid: {
                         display: false
                     }
@@ -622,9 +609,14 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
             }
         }
     });
-} else {
-    document.getElementById('growthTrendsChart').closest('.card-body').innerHTML = 
-        '<p class="text-muted text-center py-4">Not enough data for trend analysis (need at least 2 months of data)</p>';
+} else if (chartContainer) {
+    // Show message if no data
+    chartContainer.parentElement.innerHTML = 
+        '<div class="text-center py-5">' +
+        '<i class="fas fa-chart-line fa-3x text-muted mb-3"></i>' +
+        '<p class="text-muted">No data available for the chart. Please add social media data.</p>' +
+        '<a href="social_stats_entry.php" class="btn btn-sm btn-primary">Add Data</a>' +
+        '</div>';
 }
 </script>
 
@@ -662,24 +654,6 @@ if (allMonths.length > 1 && Object.keys(lineChartByPlatform).length > 0) {
 }
 .progress-bar {
     border-radius: 10px;
-}
-.bg-success {
-    background-color: #28a745 !important;
-}
-.bg-warning {
-    background-color: #ffc107 !important;
-}
-.bg-danger {
-    background-color: #dc3545 !important;
-}
-.text-success {
-    color: #28a745 !important;
-}
-.text-warning {
-    color: #ffc107 !important;
-}
-.text-danger {
-    color: #dc3545 !important;
 }
 </style>
 
