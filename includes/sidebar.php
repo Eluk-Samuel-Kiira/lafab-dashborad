@@ -12,10 +12,10 @@ $nav_items = [
         'icon' => 'fa-check-circle',
         'text' => 'QA Job Posting'
     ],
-    'posters_timetable.php' => [
-        'icon' => 'fa-calendar-alt',
-        'text' => 'Posters Timetable'
-    ],
+    // 'posters_timetable.php' => [
+    //     'icon' => 'fa-calendar-alt',
+    //     'text' => 'Posters Timetable'
+    // ],
     'seo_stats.php' => [
         'icon' => 'fa-search',
         'text' => 'SEO Stats'

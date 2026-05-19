@@ -9,6 +9,9 @@ $error = '';
 $editing = false;
 $current_rule = null;
 
+// Static PIN for protection
+define('REQUIRED_PIN', 'Samuel@13');
+
 /**
  * Lightweight formatter for rule descriptions
  * Converts markdown-like syntax to HTML safely
@@ -57,116 +60,132 @@ function stripFormatting($text) {
     return $text;
 }
 
-// Handle delete request
-if (isset($_POST['delete_rule_id'])) {
-    $delete_id = intval($_POST['delete_rule_id']);
-    
-    try {
-        $sql = "DELETE FROM qr_rules WHERE id = ?";
-        if (db_query($sql, [$delete_id])) {
-            $success = "QA rule deleted successfully!";
-        } else {
-            $error = "Error deleting QA rule!";
+// Handle delete request - requires PIN
+if (isset($_POST['delete_rule_id']) && isset($_POST['auth_pin'])) {
+    $auth_pin = $_POST['auth_pin'];
+    if ($auth_pin === REQUIRED_PIN) {
+        $delete_id = intval($_POST['delete_rule_id']);
+        
+        try {
+            $sql = "DELETE FROM qr_rules WHERE id = ?";
+            if (db_query($sql, [$delete_id])) {
+                $success = "QA rule deleted successfully!";
+            } else {
+                $error = "Error deleting QA rule!";
+            }
+        } catch (Exception $e) {
+            $error = "Error deleting: " . $e->getMessage();
         }
-    } catch (Exception $e) {
-        $error = "Error deleting: " . $e->getMessage();
+    } else {
+        $error = "Invalid PIN! Rule not deleted.";
     }
 }
 
-// Handle toggle active status
-if (isset($_POST['toggle_rule_id'])) {
-    $toggle_id = intval($_POST['toggle_rule_id']);
-    
-    try {
-        // Get current status
-        $rule = db_fetch_one("SELECT id, is_active FROM qr_rules WHERE id = ?", [$toggle_id]);
-        if ($rule) {
-            $new_status = $rule['is_active'] ? 0 : 1;
-            $sql = "UPDATE qr_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-            if (db_query($sql, [$new_status, $toggle_id])) {
-                $success = "QA rule status updated!";
+// Handle toggle active status - requires PIN
+if (isset($_POST['toggle_rule_id']) && isset($_POST['auth_pin'])) {
+    $auth_pin = $_POST['auth_pin'];
+    if ($auth_pin === REQUIRED_PIN) {
+        $toggle_id = intval($_POST['toggle_rule_id']);
+        
+        try {
+            // Get current status
+            $rule = db_fetch_one("SELECT id, is_active FROM qr_rules WHERE id = ?", [$toggle_id]);
+            if ($rule) {
+                $new_status = $rule['is_active'] ? 0 : 1;
+                $sql = "UPDATE qr_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+                if (db_query($sql, [$new_status, $toggle_id])) {
+                    $success = "QA rule status updated!";
+                }
             }
+        } catch (Exception $e) {
+            $error = "Error updating status: " . $e->getMessage();
         }
-    } catch (Exception $e) {
-        $error = "Error updating status: " . $e->getMessage();
+    } else {
+        $error = "Invalid PIN! Status not updated.";
     }
 }
 
 // Handle form submission for adding/editing rules
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']) && !isset($_POST['delete_rule_id']) && !isset($_POST['toggle_rule_id'])) {
     $id = isset($_POST['rule_id']) ? intval($_POST['rule_id']) : null;
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
-    $rule_type = $_POST['rule_type'] ?? 'general';
-    $priority = intval($_POST['priority']);
-    $is_active = isset($_POST['is_active']) ? 1 : 0;
-    $website_filter = $_POST['website_filter'] ?? 'all';
-    $poster_filter = $_POST['poster_filter'] ?? 'all';
-    $min_job_count = !empty($_POST['min_job_count']) ? intval($_POST['min_job_count']) : 0;
-    $max_job_count = !empty($_POST['max_job_count']) ? intval($_POST['max_job_count']) : null;
-    $effective_date = $_POST['effective_date'] ?? date('Y-m-d');
-    $expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
-    $created_by = $_SESSION['username'] ?? 'System';
     
-    // Validation
-    if (empty($title) || empty($description)) {
-        $error = "Title and description are required!";
-    } elseif ($min_job_count < 0) {
-        $error = "Minimum job count cannot be negative!";
-    } elseif ($max_job_count !== null && $max_job_count < $min_job_count) {
-        $error = "Maximum job count must be greater than minimum job count!";
+    // For editing existing rules, require PIN
+    if ($id > 0 && (!isset($_POST['auth_pin']) || $_POST['auth_pin'] !== REQUIRED_PIN)) {
+        $error = "Invalid PIN! Cannot edit rule.";
     } else {
-        try {
-            if ($id) {
-                // Update existing rule
-                $sql = "UPDATE qr_rules SET 
-                    title = ?, 
-                    description = ?, 
-                    rule_type = ?, 
-                    priority = ?, 
-                    is_active = ?, 
-                    website_filter = ?, 
-                    poster_filter = ?, 
-                    min_job_count = ?, 
-                    max_job_count = ?, 
-                    effective_date = ?, 
-                    expiry_date = ?, 
-                    updated_at = CURRENT_TIMESTAMP 
-                    WHERE id = ?";
-                
-                $params = [
-                    $title, $description, $rule_type, $priority, $is_active,
-                    $website_filter, $poster_filter, $min_job_count, $max_job_count,
-                    $effective_date, $expiry_date, $id
-                ];
-                
-                if (db_query($sql, $params)) {
-                    $success = "QA rule updated successfully!";
+        $title = trim($_POST['title']);
+        $description = trim($_POST['description']);
+        $rule_type = $_POST['rule_type'] ?? 'general';
+        $priority = intval($_POST['priority']);
+        $is_active = isset($_POST['is_active']) ? 1 : 0;
+        $website_filter = $_POST['website_filter'] ?? 'all';
+        $poster_filter = $_POST['poster_filter'] ?? 'all';
+        $min_job_count = !empty($_POST['min_job_count']) ? intval($_POST['min_job_count']) : 0;
+        $max_job_count = !empty($_POST['max_job_count']) ? intval($_POST['max_job_count']) : null;
+        $effective_date = $_POST['effective_date'] ?? date('Y-m-d');
+        $expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
+        $created_by = $_SESSION['username'] ?? 'System';
+        
+        // Validation
+        if (empty($title) || empty($description)) {
+            $error = "Title and description are required!";
+        } elseif ($min_job_count < 0) {
+            $error = "Minimum job count cannot be negative!";
+        } elseif ($max_job_count !== null && $max_job_count < $min_job_count) {
+            $error = "Maximum job count must be greater than minimum job count!";
+        } else {
+            try {
+                if ($id) {
+                    // Update existing rule
+                    $sql = "UPDATE qr_rules SET 
+                        title = ?, 
+                        description = ?, 
+                        rule_type = ?, 
+                        priority = ?, 
+                        is_active = ?, 
+                        website_filter = ?, 
+                        poster_filter = ?, 
+                        min_job_count = ?, 
+                        max_job_count = ?, 
+                        effective_date = ?, 
+                        expiry_date = ?, 
+                        updated_at = CURRENT_TIMESTAMP 
+                        WHERE id = ?";
+                    
+                    $params = [
+                        $title, $description, $rule_type, $priority, $is_active,
+                        $website_filter, $poster_filter, $min_job_count, $max_job_count,
+                        $effective_date, $expiry_date, $id
+                    ];
+                    
+                    if (db_query($sql, $params)) {
+                        $success = "QA rule updated successfully!";
+                    } else {
+                        $error = "Error updating rule!";
+                    }
                 } else {
-                    $error = "Error updating rule!";
+                    // Insert new rule
+                    $sql = "INSERT INTO qr_rules 
+                        (title, description, rule_type, priority, is_active, 
+                         website_filter, poster_filter, min_job_count, max_job_count, 
+                         effective_date, expiry_date, created_by) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    
+                    $params = [
+                        $title, $description, $rule_type, $priority, $is_active,
+                        $website_filter, $poster_filter, $min_job_count, $max_job_count,
+                        $effective_date, $expiry_date, $created_by
+                    ];
+                    
+                    if (db_query($sql, $params)) {
+                        $success = "QA rule added successfully!";
+                    } else {
+                        $error = "Error adding rule!";
+                    }
                 }
-            } else {
-                // Insert new rule
-                $sql = "INSERT INTO qr_rules 
-                    (title, description, rule_type, priority, is_active, 
-                     website_filter, poster_filter, min_job_count, max_job_count, 
-                     effective_date, expiry_date, created_by) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                
-                $params = [
-                    $title, $description, $rule_type, $priority, $is_active,
-                    $website_filter, $poster_filter, $min_job_count, $max_job_count,
-                    $effective_date, $expiry_date, $created_by
-                ];
-                
-                if (db_query($sql, $params)) {
-                    $success = "QA rule added successfully!";
-                } else {
-                    $error = "Error adding rule!";
-                }
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
             }
-        } catch (Exception $e) {
-            $error = "Error: " . $e->getMessage();
         }
     }
 }
@@ -519,9 +538,11 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <form method="POST" class="d-inline" onsubmit="event.preventDefault(); toggleRuleStatus(<?php echo $rule['id']; ?>, <?php echo $rule['is_active']; ?>)">
+                                        <form method="POST" class="d-inline" id="toggleForm_<?php echo $rule['id']; ?>" onsubmit="return false;">
                                             <input type="hidden" name="toggle_rule_id" value="<?php echo $rule['id']; ?>">
-                                            <button type="submit" class="btn btn-sm status-toggle <?php echo $rule['is_active'] ? 'btn-success' : 'btn-secondary'; ?>">
+                                            <input type="hidden" name="auth_pin" id="togglePin_<?php echo $rule['id']; ?>" value="">
+                                            <button type="button" class="btn btn-sm status-toggle <?php echo $rule['is_active'] ? 'btn-success' : 'btn-secondary'; ?>" 
+                                                    onclick="requirePinForToggle(<?php echo $rule['id']; ?>, <?php echo $rule['is_active']; ?>)">
                                                 <?php if ($rule['is_active']): ?>
                                                     <i class="fas fa-toggle-on me-1"></i> Active
                                                 <?php else: ?>
@@ -537,16 +558,13 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                             <button type="button" class="btn btn-outline-secondary" 
-                                                    onclick='loadRuleForEdit(<?php echo json_encode($rule); ?>)'>
+                                                    onclick='requirePinForEdit(<?php echo json_encode($rule); ?>)'>
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <form method="POST" class="d-inline" 
-                                                onsubmit="return confirmDeleteRule('<?php echo addslashes($rule['title']); ?>')">
-                                                <input type="hidden" name="delete_rule_id" value="<?php echo $rule['id']; ?>">
-                                                <button type="submit" class="btn btn-outline-danger">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-danger" 
+                                                    onclick='requirePinForDelete(<?php echo $rule['id']; ?>, "<?php echo addslashes($rule['title']); ?>")'>
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -626,6 +644,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
             </div>
             <form method="POST" id="ruleForm" onsubmit="return validateAndSubmit()">
                 <input type="hidden" name="rule_id" id="rule_id" value="">
+                <input type="hidden" name="auth_pin" id="editAuthPin" value="">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8">
@@ -866,6 +885,7 @@ $active_rules = count(array_filter($qr_rules, function($rule) {
 // Initialize EasyMDE for the description field
 let easyMDE = null;
 let currentRule = null;
+const REQUIRED_PIN = 'Samuel@13';
 
 // Formatter function for live preview (mirrors PHP formatter)
 function formatDescriptionForPreview(text) {
@@ -914,6 +934,7 @@ function validateAndSubmit() {
     }
     
     const title = document.getElementById('rule_title').value.trim();
+    const ruleId = document.getElementById('rule_id').value;
     
     if (!title) {
         alert('Please enter a rule title');
@@ -929,25 +950,77 @@ function validateAndSubmit() {
         return false;
     }
     
+    // For editing existing rules, require PIN
+    if (ruleId && ruleId !== '') {
+        const pin = prompt('Enter PIN to edit this rule:');
+        if (pin !== REQUIRED_PIN) {
+            alert('Invalid PIN! Rule not saved.');
+            return false;
+        }
+        document.getElementById('editAuthPin').value = pin;
+    }
+    
     // Set the textarea value before submit
     document.getElementById('rule_description').value = description;
     return true;
 }
 
-// Toggle rule status
-function toggleRuleStatus(ruleId, currentStatus) {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.style.display = 'none';
+// Require PIN for toggle status
+function requirePinForToggle(ruleId, currentStatus) {
+    const pin = prompt('Enter security PIN to change rule status:');
+    if (pin === null) return;
     
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'toggle_rule_id';
-    input.value = ruleId;
+    if (pin === REQUIRED_PIN) {
+        const form = document.getElementById('toggleForm_' + ruleId);
+        const pinInput = document.getElementById('togglePin_' + ruleId);
+        pinInput.value = pin;
+        form.submit();
+    } else {
+        alert('Invalid PIN! Status not changed.');
+    }
+}
+
+// Require PIN for delete
+function requirePinForDelete(ruleId, ruleTitle) {
+    const pin = prompt('Enter security PIN to delete this rule:');
+    if (pin === null) return;
     
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
+    if (pin === REQUIRED_PIN) {
+        if (confirm(`Are you sure you want to delete "${ruleTitle}"? This action cannot be undone.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.style.display = 'none';
+            
+            const ruleIdInput = document.createElement('input');
+            ruleIdInput.type = 'hidden';
+            ruleIdInput.name = 'delete_rule_id';
+            ruleIdInput.value = ruleId;
+            
+            const pinInput = document.createElement('input');
+            pinInput.type = 'hidden';
+            pinInput.name = 'auth_pin';
+            pinInput.value = pin;
+            
+            form.appendChild(ruleIdInput);
+            form.appendChild(pinInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    } else {
+        alert('Invalid PIN! Rule not deleted.');
+    }
+}
+
+// Require PIN for edit
+function requirePinForEdit(rule) {
+    const pin = prompt('Enter security PIN to edit this rule:');
+    if (pin === null) return;
+    
+    if (pin === REQUIRED_PIN) {
+        loadRuleForEdit(rule);
+    } else {
+        alert('Invalid PIN! Cannot edit rule.');
+    }
 }
 
 // View rule details
@@ -984,7 +1057,7 @@ function viewRuleDetails(rule) {
 function editCurrentRule() {
     if (currentRule) {
         bootstrap.Modal.getInstance(document.getElementById('viewDescriptionModal')).hide();
-        setTimeout(() => loadRuleForEdit(currentRule), 300);
+        setTimeout(() => requirePinForEdit(currentRule), 300);
     }
 }
 
@@ -1026,6 +1099,7 @@ function openAddRuleModal() {
     document.getElementById('min_job_count').value = '0';
     document.getElementById('max_job_count').value = '';
     document.getElementById('rule_title').value = '';
+    document.getElementById('editAuthPin').value = '';
     
     // Clear EasyMDE content
     if (easyMDE) {
@@ -1067,11 +1141,6 @@ function applyQuickRules() {
     
     const modal = new bootstrap.Modal(document.getElementById('editRuleModal'));
     modal.show();
-}
-
-// Confirm delete
-function confirmDeleteRule(title) {
-    return confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`);
 }
 
 // Initialize on page load
